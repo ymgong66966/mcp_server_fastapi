@@ -1,0 +1,68 @@
+# Development configuration for mcp-server-fastapi
+replicaCount: 1
+
+image:
+  repository: ghcr.io/ymgong66966/mcp-server-fastapi
+  tag: dev
+  pullPolicy: Always  # Always pull for development
+
+service:
+  type: ClusterIP  # Use ClusterIP for dev to save costs
+  port: 80
+  targetPort: 8080
+
+app:
+  host: "0.0.0.0"
+  logLevel: "DEBUG"  # More verbose logging for development
+  extraEnv: []
+
+resources:
+  limits:
+    cpu: "200m"
+    memory: "256Mi"
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+
+healthcheck:
+  liveness:
+    path: "/health"
+    initialDelaySeconds: 10  # Faster startup for dev
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    path: "/ready"
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 2
+  startup:
+    path: "/health"
+    initialDelaySeconds: 5  # Faster startup for dev
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 6
+
+securityContext:
+  enabled: true
+
+ingress:
+  enabled: false
+
+autoscaling:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: false
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+podAnnotations: {}
+
+podLabels:
+  environment: "development"

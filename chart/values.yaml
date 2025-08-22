@@ -1,0 +1,86 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/ymgong66966/mcp-server-fastapi
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: LoadBalancer  # This creates an AWS ELB
+  port: 80
+  targetPort: 8080
+  # nodePort is only used when type is NodePort
+  # nodePort: 30080
+
+app:
+  host: "0.0.0.0"
+  logLevel: "INFO"
+  extraEnv: []
+    # - name: OPENAI_API_KEY
+    #   value: "your-openai-key-here"
+
+resources:
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+  requests:
+    cpu: "200m"
+    memory: "256Mi"
+
+healthcheck:
+  liveness:
+    path: "/health"
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    path: "/ready"
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 2
+  startup:
+    path: "/health"
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 6
+
+securityContext:
+  enabled: true
+
+ingress:
+  enabled: false
+  # className: ""
+  # annotations: {}
+  # hosts:
+  #   - host: mcp-server.local
+  #     paths:
+  #       - path: /
+  #         pathType: Prefix
+  # tls: []
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Annotations to add to pods
+podAnnotations: {}
+
+# Labels to add to pods
+podLabels: {}
