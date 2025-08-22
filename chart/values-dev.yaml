@@ -7,7 +7,7 @@ image:
   pullPolicy: Always  # Always pull for development
 
 service:
-  type: ClusterIP  # Use ClusterIP for dev to save costs
+  type: LoadBalancer  # Use LoadBalancer for external access testing
   port: 80
   targetPort: 8080
 
