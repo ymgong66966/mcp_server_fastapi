@@ -18,10 +18,15 @@ on:
       - 'chart/**'
       - '.github/workflows/deploy.yaml'
 
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
 env:
   AWS_REGION: us-east-2
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/mcp-server-fastapi
+  IMAGE_NAME: ${{ github.repository }}
   CLUSTER_NAME: my-small-cluster
   NAMESPACE: mcp-server
 
@@ -29,6 +34,10 @@ jobs:
   build:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
       image_digest: ${{ steps.build.outputs.digest }}

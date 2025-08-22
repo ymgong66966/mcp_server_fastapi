@@ -2,7 +2,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/ymgong66966/mcp-server-fastapi
+  repository: ghcr.io/ymgong66966/mcp_server_fastapi
   tag: dev
   pullPolicy: Always  # Always pull for development
 
