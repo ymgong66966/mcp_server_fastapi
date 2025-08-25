@@ -93,6 +93,9 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
     environment: development
+    permissions:
+      contents: read
+      id-token: write
     
     steps:
     - name: Checkout
@@ -139,6 +142,9 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
+    permissions:
+      contents: read
+      id-token: write
     
     steps:
     - name: Checkout
