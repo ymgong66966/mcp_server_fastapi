@@ -2,3 +2,26 @@ fastmcp>=2.0.0
 starlette
 uvicorn[standard]
 requests
+
+# MCP SDK and client dependencies
+mcp
+
+# Async HTTP client
+aiohttp
+
+# Vector database and embeddings
+pymilvus
+langchain-community
+langchain-openai
+langchain
+openai
+
+# Web scraping and APIs
+firecrawl-py
+python-dotenv
+
+# Monitoring and observability
+langsmith
+
+# Data handling
+uuid

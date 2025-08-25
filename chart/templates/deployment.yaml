@@ -48,6 +48,35 @@ spec:
         - name: {{ .name }}
           value: {{ .value | quote }}
         {{- end }}
+        {{- if .Values.app.secrets.enabled }}
+        - name: FIRECRAWL_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.app.secrets.name }}
+              key: FIRECRAWL_API_KEY
+        - name: GOOGLE_PLACES_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.app.secrets.name }}
+              key: GOOGLE_PLACES_API_KEY
+        - name: ZILLIZ_URI
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.app.secrets.name }}
+              key: ZILLIZ_URI
+        - name: ZILLIZ_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.app.secrets.name }}
+              key: ZILLIZ_TOKEN
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.app.secrets.name }}
+              key: OPENAI_API_KEY
+        - name: DOMAIN_MAPPING_PATH
+          value: "/tmp/domain_uuid_mapping.pkl"
+        {{- end }}
         livenessProbe:
           httpGet:
             path: {{ .Values.healthcheck.liveness.path }}

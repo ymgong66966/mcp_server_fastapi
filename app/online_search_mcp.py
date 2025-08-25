@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+from typing import List
 from fastmcp import FastMCP
 from mcp import ClientSession, StdioServerParameters, stdio_client
 from web_map_zilliz_trie import zilliz_url_trie
@@ -22,7 +24,7 @@ async def online_search_implementation(query: str) -> list[dict]:
     server_params = StdioServerParameters(
         command="npx",
         args=["-y", "firecrawl-mcp"],
-        env={"FIRECRAWL_API_KEY": "fc-4e2dd3f9580f4c9094fd3ef5d2a02d97"},
+        env={"FIRECRAWL_API_KEY": os.getenv("FIRECRAWL_API_KEY", "fc-4e2dd3f9580f4c9094fd3ef5d2a02d97")},
     )
 
     async with stdio_client(server_params) as (read, write):
@@ -84,7 +86,7 @@ async def scrape_multiple_websites_implementation(urls: list[str], queries: list
     server_params = StdioServerParameters(
         command="npx",
         args=["-y", "firecrawl-mcp"],
-        env={"FIRECRAWL_API_KEY": "fc-4e2dd3f9580f4c9094fd3ef5d2a02d97"},
+        env={"FIRECRAWL_API_KEY": os.getenv("FIRECRAWL_API_KEY", "fc-4e2dd3f9580f4c9094fd3ef5d2a02d97")},
     )
     
     extract_prompt = (
@@ -176,7 +178,7 @@ async def scrape_multiple_websites_implementation(urls: list[str], queries: list
             except Exception as e:
                 return [{"error": f"Failed to process URLs: {str(e)}"}]
 
-@mcp.tool(name="website_map",           # Custom tool name for the LLM
+@online_mcp.tool(name="website_map",           # Custom tool name for the LLM
     description="""get information from the internet about something asked by user. Best for: Finding specific information across multiple websites, when you don't know which website has the information.
 When you need the most relevant content for a query
 
@@ -191,7 +193,7 @@ async def website_map(domain: str, query: List[str]):
     return relevant_urls
 @online_mcp.tool(name="google_places_search")
 async def google_places_search(location: str, location_query: str = "") -> list[dict]:
-    api = GooglePlacesAPI(api_key="AIzaSyBkUXBC57tZH4xbPiLqqcuszmUH0VOfe8U")
+    api = GooglePlacesAPI(api_key=os.getenv("GOOGLE_PLACES_API_KEY", "AIzaSyBkUXBC57tZH4xbPiLqqcuszmUH0VOfe8U"))
     results = await api.search_restaurants_by_text(location, location_query)
     return results
     

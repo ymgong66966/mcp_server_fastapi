@@ -15,6 +15,9 @@ app:
   host: "0.0.0.0"
   logLevel: "DEBUG"  # More verbose logging for development
   extraEnv: []
+  secrets:
+    enabled: true
+    name: "mcp-api-keys"
 
 resources:
   limits:

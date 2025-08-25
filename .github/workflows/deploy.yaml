@@ -95,6 +95,7 @@ jobs:
     environment: development
     permissions:
       contents: read
+      packages: read
       id-token: write
     
     steps:
@@ -118,6 +119,8 @@ jobs:
         version: 'latest'
 
     - name: Deploy to Development
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         # Extract tag from the built image
         IMAGE_TAG=$(echo "${{ needs.build.outputs.image_tag }}" | head -1)
@@ -144,6 +147,7 @@ jobs:
     environment: production
     permissions:
       contents: read
+      packages: read
       id-token: write
     
     steps:
@@ -167,6 +171,8 @@ jobs:
         version: 'latest'
 
     - name: Deploy to Production
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         # Extract tag from the built image
         IMAGE_TAG=$(echo "${{ needs.build.outputs.image_tag }}" | head -1)

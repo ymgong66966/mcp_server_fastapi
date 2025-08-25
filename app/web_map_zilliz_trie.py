@@ -34,8 +34,10 @@ class URLTrie:
         self.root = TrieNode()
         self.domain_mapping = self.load_or_create_domain_mapping()
 
-    def load_or_create_domain_mapping(self, pickle_path: str = '/Users/xyxg025/langraph_api/src/react_agent/domain_uuid_mapping.pkl') -> Dict[str, str]:
+    def load_or_create_domain_mapping(self, pickle_path: str = None) -> Dict[str, str]:
         """Load existing domain-UUID mapping or create a new one."""
+        if pickle_path is None:
+            pickle_path = os.getenv('DOMAIN_MAPPING_PATH', '/tmp/domain_uuid_mapping.pkl')
         if os.path.exists(pickle_path):
             with open(pickle_path, 'rb') as f:
                 print(f"Loading existing domain mappings from {pickle_path}")
@@ -43,8 +45,10 @@ class URLTrie:
         print(f"Creating new domain mappings file at {pickle_path}")
         return {}
 
-    def save_domain_mapping(self, pickle_path: str = '/Users/xyxg025/langraph_api/src/react_agent/domain_uuid_mapping.pkl'):
+    def save_domain_mapping(self, pickle_path: str = None):
         """Save the current domain-UUID mapping."""
+        if pickle_path is None:
+            pickle_path = os.getenv('DOMAIN_MAPPING_PATH', '/tmp/domain_uuid_mapping.pkl')
         with open(pickle_path, 'wb') as f:
             pickle.dump(self.domain_mapping, f)
         print(f"Saved domain mappings to {pickle_path}")
@@ -107,12 +111,15 @@ class URLTrie:
             await self._collect_nodes_helper(child_node, result, new_path)
 
 async def milvus_emd(nodes):
-    milvus_client = MilvusClient(uri="https://in03-d02578f8d924784.serverless.gcp-us-west1.cloud.zilliz.com", token="7fd68eede1a3136bd93d500c83d741f3fcd3405598e19fa2f3631074e5834556ad135bb7c9caf7618eab0063a8e17cd662936d8b")
+    milvus_client = MilvusClient(
+        uri=os.getenv("ZILLIZ_URI", "https://in03-d02578f8d924784.serverless.gcp-us-west1.cloud.zilliz.com"), 
+        token=os.getenv("ZILLIZ_TOKEN", "7fd68eede1a3136bd93d500c83d741f3fcd3405598e19fa2f3631074e5834556ad135bb7c9caf7618eab0063a8e17cd662936d8b")
+    )
 
     connections.connect(
         alias="default",
-        uri="https://in03-d02578f8d924784.serverless.gcp-us-west1.cloud.zilliz.com",
-        token="7fd68eede1a3136bd93d500c83d741f3fcd3405598e19fa2f3631074e5834556ad135bb7c9caf7618eab0063a8e17cd662936d8b"
+        uri=os.getenv("ZILLIZ_URI", "https://in03-d02578f8d924784.serverless.gcp-us-west1.cloud.zilliz.com"),
+        token=os.getenv("ZILLIZ_TOKEN", "7fd68eede1a3136bd93d500c83d741f3fcd3405598e19fa2f3631074e5834556ad135bb7c9caf7618eab0063a8e17cd662936d8b")
     )
 
     # Create collection
@@ -190,7 +197,7 @@ async def milvus_emd(nodes):
 async def root_url_2_trie(domain: str):
     trie = URLTrie()
     if domain not in trie.domain_mapping:
-        app = FirecrawlApp(api_key='fc-a316f888b79549cfa9bf3e23a8ec6556')
+        app = FirecrawlApp(api_key=os.getenv('FIRECRAWL_API_KEY', 'fc-a316f888b79549cfa9bf3e23a8ec6556'))
         url_list = await app.map_url(domain)
         domain_id = await trie.get_domain_uuid(domain)
         print("DOMAIN ID_1:", domain_id)
@@ -259,8 +266,8 @@ async def url_vector_search(base_query: list, domain_id: str):
         embedding_function=embeddings,
         collection_name=collection_name,
         connection_args={
-            "uri": "https://in03-d02578f8d924784.serverless.gcp-us-west1.cloud.zilliz.com",
-            "token": "7fd68eede1a3136bd93d500c83d741f3fcd3405598e19fa2f3631074e5834556ad135bb7c9caf7618eab0063a8e17cd662936d8b",
+            "uri": os.getenv("ZILLIZ_URI", "https://in03-d02578f8d924784.serverless.gcp-us-west1.cloud.zilliz.com"),
+            "token": os.getenv("ZILLIZ_TOKEN", "7fd68eede1a3136bd93d500c83d741f3fcd3405598e19fa2f3631074e5834556ad135bb7c9caf7618eab0063a8e17cd662936d8b"),
         }
     )
 
