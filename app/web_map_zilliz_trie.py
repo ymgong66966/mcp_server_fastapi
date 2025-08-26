@@ -199,11 +199,11 @@ async def root_url_2_trie(domain: str):
     if domain not in trie.domain_mapping:
         app = Firecrawl(api_key=os.getenv('FIRECRAWL_API_KEY', 'fc-a316f888b79549cfa9bf3e23a8ec6556'))
         url_list = app.map(domain, limit=50, sitemap="include")
-        domain_id = await trie.get_domain_uuid(domain)
+        domain_id = trie.get_domain_uuid(domain)
         print("DOMAIN ID_1:", domain_id)
         for url in url_list['links']:
             await trie.insert(url, domain, domain_id)
-        await trie.save_domain_mapping()
+        trie.save_domain_mapping()
         nodes = await trie.collect_nodes()
         await milvus_emd(nodes)
         return domain_id
@@ -355,9 +355,9 @@ async def zilliz_url_trie(domain, base_query):
     relevant_urls = await pick_relevant(all_results,related_queries)
     return relevant_urls
 
-# import asyncio
-# async def main():
-#     relevant_urls = await zilliz_url_trie("brightstarcare.com", ["insurance they accept?", "what services do they offer?"])
-#     print(relevant_urls)
+import asyncio
+async def main():
+    relevant_urls = await zilliz_url_trie("brightstarcare.com", ["insurance they accept?", "what services do they offer?"])
+    print(relevant_urls)
 
-# asyncio.run(main())
+asyncio.run(main())
