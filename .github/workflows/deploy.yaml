@@ -124,14 +124,27 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # Extract tag from the built image
-        IMAGE_TAG=$(echo "${{ needs.build.outputs.image_tag }}" | head -1)
+        # Debug: Show all available tags
+        echo "All image tags from build:"
+        echo "${{ needs.build.outputs.image_tag }}"
+        
+        # Extract tag from the built image - use the SHA-based tag for guaranteed uniqueness
+        IMAGE_TAG=$(echo "${{ needs.build.outputs.image_tag }}" | grep -E "develop-[a-f0-9]{7}" | head -1)
+        if [ -z "$IMAGE_TAG" ]; then
+          IMAGE_TAG=$(echo "${{ needs.build.outputs.image_tag }}" | head -1)
+        fi
+        
+        # Extract just the tag part after the colon
+        TAG_ONLY=${IMAGE_TAG##*:}
+        echo "Selected image tag: $IMAGE_TAG"
+        echo "Using tag: $TAG_ONLY"
         
         helm upgrade --install mcp-server-dev ./chart \
           --namespace ${{ env.NAMESPACE }}-dev \
           --create-namespace \
           --values ./chart/values-dev.yaml \
-          --set image.tag=${IMAGE_TAG##*:} \
+          --set image.tag="$TAG_ONLY" \
+          --set image.pullPolicy=Always \
           --wait \
           --timeout 10m
 
@@ -178,14 +191,22 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # Extract tag from the built image
-        IMAGE_TAG=$(echo "${{ needs.build.outputs.image_tag }}" | head -1)
+        # Extract tag from the built image - use the SHA-based tag for guaranteed uniqueness
+        IMAGE_TAG=$(echo "${{ needs.build.outputs.image_tag }}" | grep -E "main-[a-f0-9]{7}" | head -1)
+        if [ -z "$IMAGE_TAG" ]; then
+          IMAGE_TAG=$(echo "${{ needs.build.outputs.image_tag }}" | head -1)
+        fi
+        
+        # Extract just the tag part after the colon
+        TAG_ONLY=${IMAGE_TAG##*:}
+        echo "Using image tag: $TAG_ONLY"
         
         helm upgrade --install mcp-server-prod ./chart \
           --namespace ${{ env.NAMESPACE }} \
           --create-namespace \
           --values ./chart/values.yaml \
-          --set image.tag=${IMAGE_TAG##*:} \
+          --set image.tag="$TAG_ONLY" \
+          --set image.pullPolicy=Always \
           --wait \
           --timeout 10m
 

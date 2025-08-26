@@ -26,6 +26,9 @@ async def online_search_implementation(query: str) -> list[dict]:
         # Initialize Firecrawl client with default API key
         app = Firecrawl(api_key=os.getenv("FIRECRAWL_API_KEY", "fc-4e2dd3f9580f4c9094fd3ef5d2a02d97"))
         
+        # Debug: Show what we're searching for
+        print(f"🔍 Searching for: {query}")
+        
         # Perform search using Firecrawl's search functionality
         search_result = app.search(
             sources=["web"],
@@ -33,8 +36,22 @@ async def online_search_implementation(query: str) -> list[dict]:
             limit=3
         )
         
-        if search_result and 'data' in search_result:
-            return search_result['data']
+        # Debug: Show raw result
+        print(f"🔍 Raw search result: {search_result}")
+        
+        if search_result:
+            # Try different possible data structures
+            if isinstance(search_result, list):
+                return search_result if search_result else [{"result": f"No results found for: {query}"}]
+            elif isinstance(search_result, dict):
+                if 'data' in search_result:
+                    return search_result['data'] if search_result['data'] else [{"result": f"No results found for: {query}"}]
+                elif 'results' in search_result:
+                    return search_result['results'] if search_result['results'] else [{"result": f"No results found for: {query}"}]
+                else:
+                    return [search_result]
+            else:
+                return [{"result": str(search_result)}]
         else:
             return [{"result": f"No results found for: {query}"}]
             

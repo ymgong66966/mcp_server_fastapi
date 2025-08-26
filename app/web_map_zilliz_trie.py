@@ -8,7 +8,7 @@ import uuid
 import pickle
 import os
 import json
-from firecrawl import FirecrawlApp
+from firecrawl import Firecrawl
 from pymilvus import MilvusClient
 from langchain_community.vectorstores import Zilliz
 from langchain_openai import OpenAIEmbeddings
@@ -198,7 +198,7 @@ async def root_url_2_trie(domain: str):
     trie = URLTrie()
     if domain not in trie.domain_mapping:
         app = Firecrawl(api_key=os.getenv('FIRECRAWL_API_KEY', 'fc-a316f888b79549cfa9bf3e23a8ec6556'))
-        url_list = await app.map_url(domain, limit=50, sitemap="include")
+        url_list = app.map(domain, limit=50, sitemap="include")
         domain_id = await trie.get_domain_uuid(domain)
         print("DOMAIN ID_1:", domain_id)
         for url in url_list['links']:
