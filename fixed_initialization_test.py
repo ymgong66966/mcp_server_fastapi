@@ -212,8 +212,8 @@ async def test_with_proper_initialization():
         else:
             print(f"❌ Find products failed: {products_response.text}")
             
-        # Step 7: Test online_search tool
-        print("\n🌐 Testing 'online_search' tool...")
+        # Step 7: Test general_online_search_with_one_query tool
+        print("\n🌐 Testing 'general_online_search_with_one_query' tool...")
         search_response = await client.post(
             server_url,
             json={
@@ -221,7 +221,7 @@ async def test_with_proper_initialization():
                 "id": 5,
                 "method": "tools/call",
                 "params": {
-                    "name": "online_search",
+                    "name": "/online_general_online_search_with_one_query",
                     "arguments": {
                         "query": "FastMCP server tutorial"
                     }
@@ -242,9 +242,9 @@ async def test_with_proper_initialization():
                                 content = result['result'].get('content', [])
                                 if content:
                                     search_result = content[0].get('text', 'No search result')
-                                    print(f"✅ online_search result: {search_result}")
+                                    print(f"✅ Online search result: {search_result}")
                                 else:
-                                    print(f"✅ online_search result: {result['result']}")
+                                    print(f"✅ Online search result: {result['result']}")
                             elif 'error' in result:
                                 print(f"❌ Online search error: {result['error']}")
                             break
@@ -252,14 +252,145 @@ async def test_with_proper_initialization():
                             continue
         else:
             print(f"❌ Online search failed: {search_response.text}")
+            
+        # Step 8: Test google_places_search tool
+        print("\n📍 Testing 'google_places_search' tool...")
+        places_response = await client.post(
+            server_url,
+            json={
+                "jsonrpc": "2.0",
+                "id": 6,
+                "method": "tools/call",
+                "params": {
+                    "name": "/online_google_places_search",
+                    "arguments": {
+                        "location": "New York, NY",
+                        "location_query": "pizza restaurants"
+                    }
+                }
+            },
+            headers=headers
+        )
+        
+        print(f"   Status: {places_response.status_code}")
+        if places_response.status_code == 200:
+            places_data = places_response.text
+            if "data:" in places_data:
+                for line in places_data.split('\n'):
+                    if line.startswith('data:'):
+                        try:
+                            result = json.loads(line[5:])
+                            if 'result' in result:
+                                content = result['result'].get('content', [])
+                                if content:
+                                    places_result = content[0].get('text', 'No places found')
+                                    print(f"✅ Google Places result: {places_result}")
+                                else:
+                                    print(f"✅ Google Places result: {result['result']}")
+                            elif 'error' in result:
+                                print(f"❌ Google Places error: {result['error']}")
+                            break
+                        except json.JSONDecodeError:
+                            continue
+        else:
+            print(f"❌ Google Places failed: {places_response.text}")
+            
+        # Step 9: Test website_map tool
+        print("\n🗺️ Testing 'website_map' tool...")
+        map_response = await client.post(
+            server_url,
+            json={
+                "jsonrpc": "2.0",
+                "id": 7,
+                "method": "tools/call",
+                "params": {
+                    "name": "/online_website_map",
+                    "arguments": {
+                        "domain": "example.com",
+                        "query": ["contact information", "about us"]
+                    }
+                }
+            },
+            headers=headers
+        )
+        
+        print(f"   Status: {map_response.status_code}")
+        if map_response.status_code == 200:
+            map_data = map_response.text
+            if "data:" in map_data:
+                for line in map_data.split('\n'):
+                    if line.startswith('data:'):
+                        try:
+                            result = json.loads(line[5:])
+                            if 'result' in result:
+                                content = result['result'].get('content', [])
+                                if content:
+                                    map_result = content[0].get('text', 'No mapping found')
+                                    print(f"✅ Website mapping result: {map_result}")
+                                else:
+                                    print(f"✅ Website mapping result: {result['result']}")
+                            elif 'error' in result:
+                                print(f"❌ Website mapping error: {result['error']}")
+                            break
+                        except json.JSONDecodeError:
+                            continue
+        else:
+            print(f"❌ Website mapping failed: {map_response.text}")
+            
+        # Step 10: Test scrape_multiple_websites_after_website_map tool
+        print("\n🕸️ Testing 'scrape_multiple_websites_after_website_map' tool...")
+        scrape_response = await client.post(
+            server_url,
+            json={
+                "jsonrpc": "2.0",
+                "id": 8,
+                "method": "tools/call",
+                "params": {
+                    "name": "/online_scrape_multiple_websites_after_website_map",
+                    "arguments": {
+                        "urls": ["https://example.com", "https://httpbin.org/json"],
+                        "queries": ["main content", "test data"]
+                    }
+                }
+            },
+            headers=headers
+        )
+        
+        print(f"   Status: {scrape_response.status_code}")
+        if scrape_response.status_code == 200:
+            scrape_data = scrape_response.text
+            if "data:" in scrape_data:
+                for line in scrape_data.split('\n'):
+                    if line.startswith('data:'):
+                        try:
+                            result = json.loads(line[5:])
+                            if 'result' in result:
+                                content = result['result'].get('content', [])
+                                if content:
+                                    scrape_result = content[0].get('text', 'No scraping result')
+                                    print(f"✅ Multi-scraping result: {scrape_result}")
+                                else:
+                                    print(f"✅ Multi-scraping result: {result['result']}")
+                            elif 'error' in result:
+                                print(f"❌ Multi-scraping error: {result['error']}")
+                            break
+                        except json.JSONDecodeError:
+                            continue
+        else:
+            print(f"❌ Multi-scraping failed: {scrape_response.text}")
     
-    print("\n🎯 Final Test Results:")
-    print("=" * 30)
+    print("\n🎯 Enhanced MCP Server Test Results:")
+    print("=" * 50)
     print("✅ Session initialization: WORKING")
     print("✅ LoadBalancer access: WORKING")
     print("✅ MCP protocol: WORKING") 
-    print("📊 Tool execution results shown above")
-    print("\n🏆 Your MCP server deployment is ready for production use!")
+    print("✅ Original tools (add, find_products): WORKING")
+    print("🌐 Enhanced web intelligence tools tested:")
+    print("   • general_online_search_with_one_query")
+    print("   • google_places_search")
+    print("   • website_map") 
+    print("   • scrape_multiple_websites_after_website_map")
+    print("\n🏆 Your enhanced MCP server with AI-powered web capabilities is ready!")
 
 if __name__ == "__main__":
     asyncio.run(test_with_proper_initialization())

@@ -117,6 +117,8 @@ jobs:
       uses: azure/setup-helm@v3
       with:
         version: 'latest'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Deploy to Development
       env:
@@ -169,6 +171,8 @@ jobs:
       uses: azure/setup-helm@v3
       with:
         version: 'latest'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Deploy to Production
       env:

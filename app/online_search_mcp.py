@@ -3,7 +3,6 @@ import json
 import os
 from typing import List
 from fastmcp import FastMCP
-from mcp import ClientSession, StdioServerParameters, stdio_client
 from web_map_zilliz_trie import zilliz_url_trie
 from google_maps_api import GooglePlacesAPI
 online_mcp = FastMCP(name="online-search-mcp")
@@ -20,43 +19,28 @@ When you need comprehensive coverage of a single website (use map or crawl)
     
 )
 async def online_search_implementation(query: str) -> list[dict]:
-    """Internal function description (ignored if description is provided above)."""
-    server_params = StdioServerParameters(
-        command="npx",
-        args=["-y", "firecrawl-mcp"],
-        env={"FIRECRAWL_API_KEY": os.getenv("FIRECRAWL_API_KEY", "fc-4e2dd3f9580f4c9094fd3ef5d2a02d97")},
-    )
-
-    async with stdio_client(server_params) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-
-            # 1) List available tools
-            tools_resp = await session.list_tools()
-            print("Tools:", [t.name for t in tools_resp.tools])
-
-            # 2) Find firecrawl_search and show its input schema
-            search_tool = next((t for t in tools_resp.tools if t.name == "firecrawl_search"), None)
-            if not search_tool:
-                raise RuntimeError("firecrawl_search tool not found. Check tool names printed above.")
-            print("\nfirecrawl_search input schema:")
-            print(json.dumps(search_tool.inputSchema or {}, indent=2))
-
-            # Use the actual query parameter instead of hardcoded value
-            args = {
-                "query": query,
-                "limit": 3,
-                "sources": [{"type": "web"}]
-            }
-
-            result = await session.call_tool("firecrawl_search", args)
-            print(result)
+    """Direct Firecrawl API search implementation."""
+    try:
+        from firecrawl import Firecrawl
+        
+        # Initialize Firecrawl client with default API key
+        app = Firecrawl(api_key=os.getenv("FIRECRAWL_API_KEY", "fc-4e2dd3f9580f4c9094fd3ef5d2a02d97"))
+        
+        # Perform search using Firecrawl's search functionality
+        search_result = app.search(
+            sources=["web"],
+            query=query,
+            limit=3
+        )
+        
+        if search_result and 'data' in search_result:
+            return search_result['data']
+        else:
+            return [{"result": f"No results found for: {query}"}]
             
-            # Return the actual search results
-            if hasattr(result, 'content') and result.content:
-                return result.content
-            else:
-                return [{"result": f"couldn't retrieve results for: {query}"}]
+    except Exception as e:
+        print(f"Search error: {str(e)}")
+        return [{"error": f"Search failed: {str(e)}"}]
 
 @online_mcp.tool(
         name="scrape_multiple_websites_after_website_map",           # Custom tool name for the LLM
@@ -70,7 +54,7 @@ When you need comprehensive coverage of a single website (use map or crawl)
     
 )
 async def scrape_multiple_websites_implementation(urls: list[str], queries: list[str]) -> list[dict]:
-    """Scrape multiple websites concurrently with proper error handling."""
+    """Direct Firecrawl API scraping implementation using proper Firecrawl methods."""
     
     # Input validation
     if not urls:
@@ -83,100 +67,79 @@ async def scrape_multiple_websites_implementation(urls: list[str], queries: list
     if len(urls) > MAX_CONCURRENT:
         urls = urls[:MAX_CONCURRENT]
     
-    server_params = StdioServerParameters(
-        command="npx",
-        args=["-y", "firecrawl-mcp"],
-        env={"FIRECRAWL_API_KEY": os.getenv("FIRECRAWL_API_KEY", "fc-4e2dd3f9580f4c9094fd3ef5d2a02d97")},
-    )
-    
-    extract_prompt = (
-        f"queries: {str(queries)}\n"
-        "answer: answer with the information you get from the website. "
-        "if cannot find answer, return 'answer not found'"
-    )
+    try:
+        from firecrawl import Firecrawl
+        from pydantic import BaseModel
+        
+        # Define the schema using Pydantic
+        class QueryResponse(BaseModel):
+            queries: str
+            answer: str
+        
+        # Initialize Firecrawl client with default API key
+        app = Firecrawl(api_key=os.getenv("FIRECRAWL_API_KEY", "fc-4e2dd3f9580f4c9094fd3ef5d2a02d97"))
+        
+        extract_prompt = (
+            f"queries: {str(queries)}\n"
+            "answer: answer with the information you get from the website. "
+            "if cannot find answer, return 'answer not found'"
+        )
 
-    schema = {
-        "type": "object",
-        "properties": {
-            "queries": {"type": "string"},
-            "answer": {"type": "string"},
-        },
-        "required": ["queries", "answer"]
-    }
-
-    async def scrape_single_url(session: ClientSession, url: str) -> dict:
-        """Scrape a single URL with error handling."""
-        try:
-            args = {
-                "url": url,
-                "formats": [
-                    {
+        async def scrape_single_url(url: str) -> dict:
+            """Scrape a single URL with error handling."""
+            try:
+                # Use Firecrawl scrape with JSON extraction
+                result = app.scrape(
+                    url,
+                    formats=[{
                         "type": "json",
-                        "prompt": extract_prompt,
-                        "schema": schema
+                        "schema": QueryResponse,
+                        "prompt": extract_prompt
+                    }],
+                    only_main_content=True,
+                    timeout=30000
+                )
+                
+                if result and hasattr(result, 'json') and result.json:
+                    return {
+                        "url": url,
+                        "status": "success",
+                        "content": result.json
                     }
-                ],
-                "onlyMainContent": False,
-                "removeBase64Images": True,
-                "waitFor": 1500
-            }
-            
-            result = await session.call_tool("firecrawl_scrape", args)
-            
-            if hasattr(result, 'content') and result.content:
-                content = result.content.text if hasattr(result.content, 'text') else str(result.content)
-                return {
-                    "url": url,
-                    "status": "success",
-                    "content": content
-                }
-            else:
+                else:
+                    return {
+                        "url": url,
+                        "status": "error",
+                        "error": "No content extracted"
+                    }
+                    
+            except Exception as e:
                 return {
                     "url": url,
                     "status": "error",
-                    "error": "No content returned"
+                    "error": str(e)
                 }
-                
-        except Exception as e:
-            return {
-                "url": url,
-                "status": "error",
-                "error": str(e)
-            }
 
-    async with stdio_client(server_params) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-
-            # Verify scrape tool is available
-            try:
-                tools = await session.list_tools()
-                if not any(t.name == "firecrawl_scrape" for t in tools.tools):
-                    return [{"error": f"firecrawl_scrape tool not found. Available tools: {[t.name for t in tools.tools]}"}]
-            except Exception as e:
-                return [{"error": f"Failed to list tools: {str(e)}"}]
-            
-            # Process URLs concurrently
-            try:
-                tasks = [scrape_single_url(session, url) for url in urls]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                
-                # Handle any exceptions from gather
-                processed_results = []
-                for i, result in enumerate(results):
-                    if isinstance(result, Exception):
-                        processed_results.append({
-                            "url": urls[i],
-                            "status": "error",
-                            "error": f"Task failed: {str(result)}"
-                        })
-                    else:
-                        processed_results.append(result)
-                
-                return processed_results
-                
-            except Exception as e:
-                return [{"error": f"Failed to process URLs: {str(e)}"}]
+        # Process URLs concurrently
+        tasks = [scrape_single_url(url) for url in urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Handle any exceptions from gather
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append({
+                    "url": urls[i],
+                    "status": "error",
+                    "error": f"Task failed: {str(result)}"
+                })
+            else:
+                processed_results.append(result)
+        
+        return processed_results
+        
+    except Exception as e:
+        return [{"error": f"Scraping setup failed: {str(e)}"}]
 
 @online_mcp.tool(name="website_map",           # Custom tool name for the LLM
     description="""get information from the internet about something asked by user. Best for: Finding specific information across multiple websites, when you don't know which website has the information.
