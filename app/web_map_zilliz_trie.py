@@ -201,8 +201,15 @@ async def root_url_2_trie(domain: str):
         url_list = app.map(domain, limit=50, sitemap="include")
         domain_id = trie.get_domain_uuid(domain)
         print("DOMAIN ID_1:", domain_id)
-        for url in url_list['links']:
+        print(url_list, "url_list")
+        
+        # Access links attribute directly from MapData object
+        links = url_list.links if hasattr(url_list, 'links') else []
+        for link_result in links:
+            # Extract URL from LinkResult object
+            url = link_result.url if hasattr(link_result, 'url') else str(link_result)
             await trie.insert(url, domain, domain_id)
+            
         trie.save_domain_mapping()
         nodes = await trie.collect_nodes()
         await milvus_emd(nodes)
@@ -355,9 +362,10 @@ async def zilliz_url_trie(domain, base_query):
     relevant_urls = await pick_relevant(all_results,related_queries)
     return relevant_urls
 
-import asyncio
-async def main():
-    relevant_urls = await zilliz_url_trie("brightstarcare.com", ["insurance they accept?", "what services do they offer?"])
-    print(relevant_urls)
+# Commented out test code to prevent execution on import
+# import asyncio
+# async def main():
+#     relevant_urls = await zilliz_url_trie("https://care.homeinstead.com/", ["insurance they accept?", "what services do they offer?"])
+#     print(relevant_urls)
 
-asyncio.run(main())
+# asyncio.run(main())
