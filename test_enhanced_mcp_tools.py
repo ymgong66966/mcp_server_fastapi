@@ -129,8 +129,8 @@ async def test_enhanced_mcp_tools():
                 "params": {
                     "name": "/online_website_map",
                     "arguments": {
-                        "domain": "docs.anthropic.com",
-                        "query": ["claude api documentation", "getting started"]
+                        "domain": "angelshomecare.com",
+                        "query": ['dementia care', 'services for elderly', 'senior care', 'dementia support']
                     }
                 }
             },
@@ -152,10 +152,10 @@ async def test_enhanced_mcp_tools():
                     "name": "/online_scrape_multiple_websites_after_website_map",
                     "arguments": {
                         "urls": [
-                            "https://example.com",
+                            "https://modelcontextprotocol.io/examples",
                             "https://httpbin.org/json"
                         ],
-                        "queries": ["main content", "sample data"]
+                        "queries": ["what are the mcp servers?"]
                     }
                 }
             },

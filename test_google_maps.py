@@ -1,7 +1,13 @@
+import asyncio
 import aiohttp
 import json
+import os
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class GooglePlacesAPI:
     """Async Google Places API client for searching nearby places, text search, and geocoding."""
@@ -34,7 +40,7 @@ class GooglePlacesAPI:
                 enriched_place['domain'] = None
             enriched_places.append(enriched_place)
         return enriched_places
-    
+
     async def search_text(
         self,
         text_query: str,
@@ -77,7 +83,7 @@ class GooglePlacesAPI:
             return {"error": f"API request failed: {str(e)}"}
         except json.JSONDecodeError as e:
             return {"error": f"Failed to parse response: {str(e)}"}
-    
+
     async def search_text_with_websites(
         self,
         text_query: str,
@@ -103,67 +109,96 @@ class GooglePlacesAPI:
             
         places = result.get("places", [])
         return self.enrich_places_with_domain(places)
+
+async def test_google_places_api():
+    """Test function to demonstrate Google Places API functionality with website data."""
     
-    async def search_restaurants_by_text(
-        self,
-        location: str,
-        location_query: str = "",
-        max_results: int = 10
-    ) -> List[Dict[str, Any]]:
-        """
-        Convenience method to search for restaurants using text query.
-        
-        Args:
-            location: Location like "Sydney, Australia" or "New York"
-            location_type: Optional cuisine type like "Spicy Vegetarian", "Italian", etc.
-            max_results: Maximum number of results
-            
-        Returns:
-            List of restaurant data dictionaries with website domains
-        """
-        if location_query:
-            query = f"{location_query} in {location}"
-        else:
-            query = f"restaurants in {location}"
-            
-        result = await self.search_text(
-            text_query=query,
-            max_result_count=max_results
+    # Get API key from environment variable
+    api_key = "AIzaSyBkUXBC57tZH4xbPiLqqcuszmUH0VOfe8U"
+    if not api_key:
+        print("❌ Error: GOOGLE_MAPS_API_KEY environment variable not set")
+        return
+    
+    # Initialize the API client
+    google_api = GooglePlacesAPI(api_key)
+    
+    print("🚀 Testing Google Places API with Website Data")
+    print("=" * 50)
+    
+    # Test 1: Search for coffee shops with website information
+    print("\n☕ TEST 1: Coffee Shops in San Francisco")
+    print("-" * 40)
+    
+    try:
+        places = await google_api.search_text_with_websites(
+            "coffee shops in San Francisco", 
+            max_result_count=5
         )
         
-        if "error" in result:
-            return []
+        if places:
+            for i, place in enumerate(places, 1):
+                print(f"\n{i}. {place.get('displayName', {}).get('text', 'Unknown')}")
+                print(f"   📍 Address: {place.get('formattedAddress', 'N/A')}")
+                print(f"   ⭐ Rating: {place.get('rating', 'N/A')}")
+                print(f"   🌐 Website: {place.get('websiteUri', 'N/A')}")
+                print(f"   🔗 Domain: {place.get('domain', 'N/A')}")
+        else:
+            print("No results found")
             
-        places = result.get("places", [])
-        return self.enrich_places_with_domain(places)
+    except Exception as e:
+        print(f"❌ Error in coffee shop search: {e}")
     
-    async def geocode_address(self, address: str) -> Optional[tuple]:
-        """
-        Geocode an address to coordinates using Google Maps Geocoding API.
+    # Test 2: Search for restaurants with specific cuisine
+    print("\n\n🍕 TEST 2: Italian Restaurants in New York")
+    print("-" * 40)
+    
+    try:
+        result = await google_api.search_text(
+            "Italian restaurants in New York",
+            max_result_count=3
+        )
         
-        Args:
-            address: Address to geocode
-        
-        Returns:
-            Tuple of (latitude, longitude) or None if geocoding fails
-        """
-        params = {
-            "address": address,
-            "key": self.api_key
-        }
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(self.geocoding_url, params=params) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    
-                    if data["status"] == "OK":
-                        lat = data["results"][0]["geometry"]["location"]["lat"]
-                        lng = data["results"][0]["geometry"]["location"]["lng"]
-                        return lat, lng
-                    else:
-                        return None
+        if "error" not in result:
+            places = result.get("places", [])
+            enriched_places = google_api.enrich_places_with_domain(places)
             
-        except aiohttp.ClientError as e:
-            return None
+            for i, place in enumerate(enriched_places, 1):
+                print(f"\n{i}. {place.get('displayName', {}).get('text', 'Unknown')}")
+                print(f"   📍 Address: {place.get('formattedAddress', 'N/A')}")
+                print(f"   ⭐ Rating: {place.get('rating', 'N/A')}")
+                print(f"   🌐 Website: {place.get('websiteUri', 'N/A')}")
+                print(f"   🔗 Domain: {place.get('domain', 'N/A')}")
+        else:
+            print(f"❌ Error: {result['error']}")
+            
+    except Exception as e:
+        print(f"❌ Error in restaurant search: {e}")
+    
+    # Test 3: Search for healthcare facilities
+    print("\n\n🏥 TEST 3: Healthcare Facilities in Chicago")
+    print("-" * 40)
+    
+    try:
+        places = await google_api.search_text_with_websites(
+            "hospitals and clinics in Chicago",
+            max_result_count=3
+        )
+        
+        if places:
+            for i, place in enumerate(places, 1):
+                print(f"\n{i}. {place.get('displayName', {}).get('text', 'Unknown')}")
+                print(f"   📍 Address: {place.get('formattedAddress', 'N/A')}")
+                print(f"   ⭐ Rating: {place.get('rating', 'N/A')}")
+                print(f"   🌐 Website: {place.get('websiteUri', 'N/A')}")
+                print(f"   🔗 Domain: {place.get('domain', 'N/A')}")
+        else:
+            print("No results found")
+            
+    except Exception as e:
+        print(f"❌ Error in healthcare search: {e}")
+    
+    print("\n" + "=" * 50)
+    print("✅ Google Places API Test Complete!")
+
+if __name__ == "__main__":
+    asyncio.run(test_google_places_api())
