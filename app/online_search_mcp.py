@@ -1,7 +1,8 @@
 import asyncio
 import json
 import os
-from typing import List
+import requests
+from typing import List, Dict, Any, Optional
 from fastmcp import FastMCP
 # from web_map_zilliz_trie import zilliz_url_trie
 from google_maps_api import GooglePlacesAPI
@@ -99,7 +100,6 @@ async def scrape_multiple_websites_implementation(urls: list[str], queries: list
             "answer: answer with the information you get from the website. "
             "if cannot find answer, return 'answer not found'"
         )
-
         async def scrape_single_url(url: str) -> dict:
             """Scrape a single URL with error handling."""
             try:
