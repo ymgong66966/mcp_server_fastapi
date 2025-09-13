@@ -363,9 +363,9 @@ async def zilliz_url_trie(domain, base_query):
     return relevant_urls
 
 # Commented out test code to prevent execution on import
-# import asyncio
-# async def main():
-#     relevant_urls = await zilliz_url_trie("https://care.homeinstead.com/", ["insurance they accept?", "what services do they offer?"])
-#     print(relevant_urls)
+import asyncio
+async def main():
+    relevant_urls = await zilliz_url_trie("comfortkeepers.com/", ['dementia care', 'services for elderly', 'senior care', 'dementia support'])
+    print(relevant_urls)
 
-# asyncio.run(main())
+asyncio.run(main())

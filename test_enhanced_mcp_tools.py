@@ -129,7 +129,7 @@ async def test_enhanced_mcp_tools():
                 "params": {
                     "name": "/online_website_map",
                     "arguments": {
-                        "domain": "angelshomecare.com",
+                        "domain": "comfortkeepers.com",
                         "query": ['dementia care', 'services for elderly', 'senior care', 'dementia support']
                     }
                 }

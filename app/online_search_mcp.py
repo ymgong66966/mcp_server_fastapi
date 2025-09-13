@@ -3,17 +3,17 @@ import json
 import os
 from typing import List
 from fastmcp import FastMCP
-from web_map_zilliz_trie import zilliz_url_trie
+# from web_map_zilliz_trie import zilliz_url_trie
 from google_maps_api import GooglePlacesAPI
+from dotenv import load_dotenv
+load_dotenv()
 online_mcp = FastMCP(name="online-search-mcp")
 
 @online_mcp.tool(
         name="general_online_search_with_one_query",           # Custom tool name for the LLM
-    description="""get information from the internet about something asked by user. Best for: Finding specific information across multiple websites, when you don't know which website has the information.
-When you need the most relevant content for a query
+    description="""get general information from the internet about something asked by user. Best for: quick one-off Q&A about something. It is like someone wants you to search on google for them about something they don't have knowledge of. For exmaple: "What is respite care?", "What is a power of attorney?", "What is Medicaid?", "Define hospice care." etc. You can use this tool to get general information about something.
 
-Not recommended for: When you already know which website to scrape (use scrape)
-When you need comprehensive coverage of a single website (use map or crawl)
+Not recommended for: when the user is asking for some specific information about a website or company. In this case you should use website_map tool first to get the urls of interest. The only exception is when the website_map or scrape_multiple_websites_after_website_map tools didn't return meaningful results. This tool can be used as the last resort in that case.
 """, # Custom description
     tags={ "online search"},      # Optional tags for organization/filtering
     
@@ -61,11 +61,9 @@ async def online_search_implementation(query: str) -> list[dict]:
 
 @online_mcp.tool(
         name="scrape_multiple_websites_after_website_map",           # Custom tool name for the LLM
-    description="""get information from the internet about something asked by user. Best for: Finding specific information across multiple websites, when you don't know which website has the information.
-When you need the most relevant content for a query
+    description="""Get information from a list of urls about a list of queries. The input: a list of urls (strings) and a list of queries (strings). The output: a list of dictionaries (each dictionary contains the "queries" (string), the "answer" (string)). Best for: When you know which websites/urls you are interested in and want to dive deep into these websites and scrape information about a certain topic.
 
-Not recommended for: When you already know which website to scrape (use scrape)
-When you need comprehensive coverage of a single website (use map or crawl)
+Not recommended for: when you only have a web domain or company front web page and still don't know which exact urls are of interest to you. In this case you should use website_map tool first to get the urls of interest.
 """, # Custom description
     tags={ "online search"},      # Optional tags for organization/filtering
     
@@ -159,21 +157,86 @@ async def scrape_multiple_websites_implementation(urls: list[str], queries: list
         return [{"error": f"Scraping setup failed: {str(e)}"}]
 
 @online_mcp.tool(name="website_map",           # Custom tool name for the LLM
-    description="""get information from the internet about something asked by user. Best for: Finding specific information across multiple websites, when you don't know which website has the information.
-When you need the most relevant content for a query
+    description="""Get relevant urls of a web domain about something asked by user. Best for: Finding specific information across multiple websites, when you don't know which website has the information. When you need the most relevant content for a query. 
+    Example use case: a user asks follow-up questions about an in-home care agency which we have the website of. The input of the tool are the domain of that website as a string and a list of short queries that contain the user's intention and the city/area of interest. The output of the tool is a list of dictionaries (each dictionary contains the url, the title of the page, and the description of the page). If you think the description of the page is not informative enough, you can then use the urls as the input of the scrape_multiple_websites_after_website_map tool.
+    
+    IMPORTANT NOTES about the list of queries: 
+    the list cannot have more than 3 query strings. Each query string should be short and concise. For example, if user asks about "can you check if this company has services for older adults with dementia?" and from the previous messages or context, we know that the user is interested in the city of oak park, Chicago, then the list of queries should be ["dementia services, Oak Park, Chicago", "Alzheimer services, Oak Park, Chicago"]. You will be punished if the list has more than 3 query strings or if the query strings are not short and informative.
 
-Not recommended for: When you already know which website to scrape (use scrape)
-When you need comprehensive coverage of a single website (use map or crawl)
+Not recommended for: When you already know which urls to scrape and need comprehensive coverage of these urls (use scrape_multiple_websites_after_website_map tool)
+
 """, # Custom description
     tags={ "online search"})
-async def website_map(domain: str, query: List[str]):
+async def website_map(
+    url: str = "https://firecrawl.dev",
+    search_queries: list[str] = ["docs"],
+) -> Optional[Dict[str, Any]]:
     """The purpose of this function is to retrieve relevant information from a website based on a user's query. The function takes a web domain and a list of queries as input and returns a list of relevant URLs."""
-    print(domain, query, "domain and query")
-    relevant_urls = await zilliz_url_trie(domain, query)
-    return relevant_urls
+    
+    # API endpoint
+    limit = 3
+    sitemap = "include"
+    api_key = os.getenv("FIRECRAWL_API_KEY", "fc-a316f888b79549cfa9bf3e23a8ec6556")
+    endpoint = "https://api.firecrawl.dev/v2/map"
+    
+    # Headers
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {api_key}'
+    }
+    
+    # Request payload
+    result_urls = set()
+    result_ls = []
+    for search in search_queries:
+        payload = {
+            "url": url,
+            "search": search,
+            "limit": limit,
+            "sitemap": sitemap
+    }
+    
+        try:
+            
+            # Make the POST request
+            response = requests.post(
+                endpoint,
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            
+            # Check if request was successful
+            response.raise_for_status()
+            
+            # Parse JSON response
+            result = response.json()
+            for link in result['links']:
+                if link['url'] not in result_urls:
+                    result_urls.add(link['url'])
+                    result_ls.append(link)
+            
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Request Error: {e}")
+            return None
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON Decode Error: {e}")
+            print(f"Raw response: {response.text}")
+            return None
+        except Exception as e:
+            print(f"❌ Unexpected Error: {e}")
+            return None
+    
+    return result_ls
+
 @online_mcp.tool(name="google_places_search")
 async def google_places_search(location: str, location_query: str = "") -> list[dict]:
     api = GooglePlacesAPI(api_key=os.getenv("GOOGLE_PLACES_API_KEY", "AIzaSyBkUXBC57tZH4xbPiLqqcuszmUH0VOfe8U"))
     results = await api.search_restaurants_by_text(location, location_query)
     return results
     
+# async def website_map(domain: str, query: List[str]):
+#     """The purpose of this function is to retrieve relevant information from a website based on a user's query. The function takes a web domain and a list of queries as input and returns a list of relevant URLs."""
+#     print(domain, query, "domain and query")
+#     relevant_urls = await zilliz_url_trie(domain, query)
+#     return relevant_urls
