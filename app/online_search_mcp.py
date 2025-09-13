@@ -62,7 +62,7 @@ async def online_search_implementation(query: str) -> list[dict]:
 
 @online_mcp.tool(
         name="scrape_multiple_websites_after_website_map",           # Custom tool name for the LLM
-    description="""Get information from a list of urls about a list of queries. The input: a list of urls (strings) and a list of queries (strings). The output: a list of dictionaries (each dictionary contains the "queries" (string), the "answer" (string)). Best for: When you know which websites/urls you are interested in and want to dive deep into these websites and scrape information about a certain topic.
+    description="""Get information from a list of urls about a list of queries. The input: a list of urls (strings) and a list of queries (strings). The output: a list of dictionaries (each dictionary contains the "queries" (string), the "answer" (string)). Best for: When you know which websites/urls you are interested in and want to dive deep into these websites and scrape information about a certain topic. When you are using this tool, you should input a list of the urls you think are of interest from the context or previous tools, and a list of queries you want to scrape information about. Make sure your queries are super relevant to the user intent and concise, otherwise you will be punished harshly. 
 
 Not recommended for: when you only have a web domain or company front web page and still don't know which exact urls are of interest to you. In this case you should use website_map tool first to get the urls of interest.
 """, # Custom description
@@ -142,14 +142,15 @@ async def scrape_multiple_websites_implementation(urls: list[str], queries: list
         # Handle any exceptions from gather
         processed_results = []
         for i, result in enumerate(results):
-            if isinstance(result, Exception):
+            if result["status"] != "success":
                 processed_results.append({
                     "url": urls[i],
                     "status": "error",
                     "error": f"Task failed: {str(result)}"
                 })
             else:
-                processed_results.append(result)
+                if "answer not found" not in result["content"]["answer"].lower():
+                    processed_results.append(result)
         
         return processed_results
         
@@ -170,7 +171,7 @@ Not recommended for: When you already know which urls to scrape and need compreh
 async def website_map(
     url: str = "https://firecrawl.dev",
     search_queries: list[str] = ["docs"],
-) -> Optional[Dict[str, Any]]:
+) -> list[dict]:
     """The purpose of this function is to retrieve relevant information from a website based on a user's query. The function takes a web domain and a list of queries as input and returns a list of relevant URLs."""
     
     # API endpoint

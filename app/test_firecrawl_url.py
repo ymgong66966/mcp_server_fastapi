@@ -66,6 +66,93 @@ async def website_map(
     
     return result_ls
 
+
+async def scrape_multiple_websites_implementation(urls: list[str], queries: list[str]) -> list[dict]:
+    """Direct Firecrawl API scraping implementation using proper Firecrawl methods."""
+    
+    # Input validation
+    if not urls:
+        return [{"error": "No URLs provided"}]
+    if not queries:
+        return [{"error": "No queries provided"}]
+    
+    # Limit concurrent requests to avoid overwhelming servers
+    MAX_CONCURRENT = 5
+    if len(urls) > MAX_CONCURRENT:
+        urls = urls[:MAX_CONCURRENT]
+    
+    try:
+        from firecrawl import Firecrawl
+        from pydantic import BaseModel
+        
+        # Define the schema using Pydantic
+        class QueryResponse(BaseModel):
+            queries: str
+            answer: str
+        
+        # Initialize Firecrawl client with default API key
+        app = Firecrawl(api_key=os.getenv("FIRECRAWL_API_KEY", "fc-4e2dd3f9580f4c9094fd3ef5d2a02d97"))
+        
+        extract_prompt = (
+            f"queries: {str(queries)}\n"
+            "answer: answer with the information you get from the website. "
+            "if cannot find answer, return 'answer not found'"
+        )
+        async def scrape_single_url(url: str) -> dict:
+            """Scrape a single URL with error handling."""
+            try:
+                # Use Firecrawl scrape with JSON extraction
+                result = app.scrape(
+                    url,
+                    formats=[{
+                        "type": "json",
+                        "schema": QueryResponse,
+                        "prompt": extract_prompt
+                    }],
+                    only_main_content=True,
+                    timeout=30000
+                )
+                
+                if result and hasattr(result, 'json') and result.json:
+                    return {
+                        "url": url,
+                        "status": "success",
+                        "content": result.json
+                    }
+                else:
+                    return {
+                        "url": url,
+                        "status": "error",
+                        "error": "No content extracted"
+                    }
+                    
+            except Exception as e:
+                return {
+                    "url": url,
+                    "status": "error",
+                    "error": str(e)
+                }
+
+        # Process URLs concurrently
+        tasks = [scrape_single_url(url) for url in urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Handle any exceptions from gather
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append({
+                    "url": urls[i],
+                    "status": "error",
+                    "error": f"Task failed: {str(result)}"
+                })
+            else:
+                processed_results.append(result)
+        
+        return processed_results
+        
+    except Exception as e:
+        return [{"error": f"Scraping setup failed: {str(e)}"}]
 async def main():
     """Main function to test different URLs and search terms."""
     
@@ -92,6 +179,12 @@ async def main():
             print(result)
         else:
             print(f"❌ Test {i} failed")
+    test_case_2 = {
+        "urls": ["https://www.comfortkeepers.com/offices/california/los-angeles/areas-served/area/inglewood/service/alzheimer's-and-dementia-care/"],
+        "queries": ["how do they support dementia people"],
+    }
+    result = await scrape_multiple_websites_implementation(test_case_2["urls"], test_case_2["queries"])
+    print(result)
         
 
 if __name__ == "__main__":
