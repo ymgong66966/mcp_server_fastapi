@@ -3,6 +3,9 @@ import json
 import asyncio
 from typing import Dict, Any, Optional
 import os
+from langchain_core.messages import ToolMessage
+import uuid
+
 async def website_map(
     url: str = "https://firecrawl.dev",
     search_queries: list[str] = ["docs"],
@@ -47,7 +50,6 @@ async def website_map(
             
             # Parse JSON response
             result = response.json()
-            print(result)
             for link in result['links']:
                 if link['url'] not in result_urls:
                     result_urls.add(link['url'])
@@ -153,39 +155,97 @@ async def scrape_multiple_websites_implementation(urls: list[str], queries: list
         
     except Exception as e:
         return [{"error": f"Scraping setup failed: {str(e)}"}]
-async def main():
-    """Main function to test different URLs and search terms."""
-    
-    # Test cases
-    test_cases = [
-        {
-            "url": "comfortkeepers.com",
-            "search_queries":[ "veteran benefits, LA", "veteran benefits, LA" ],
-        },
-    ]
-    
-    for i, test_case in enumerate(test_cases, 1):
-        print(f"\n{'='*60}")
-        print(f"TEST {i}: {test_case['url']}")
-        print(f"{'='*60}")
+
+async def execute_single_tool(tool_call):
+    try:
+
+        observation = await website_map(tool_call["args"]["url"], tool_call["args"]["search_queries"])
         
-        result = await website_map(
-            url=test_case["url"],
-            search_queries=test_case["search_queries"],
+        # Create enhanced, contextual tool message
+        formatted_result = observation
+        return ToolMessage(
+            content=f"""🔧 TOOL EXECUTED:
+📝 Called with parameters: {json.dumps(tool_call["args"], indent=2)}
+
+{formatted_result}
+
+---""",
+            tool_call_id=str(uuid.uuid4())
         )
         
-        if result:
-            print(f"✅ Test {i} completed successfully")
-            print(result)
-        else:
-            print(f"❌ Test {i} failed")
-    test_case_2 = {
-        "urls": ["https://www.comfortkeepers.com/offices/california/los-angeles/areas-served/area/inglewood/service/alzheimer's-and-dementia-care/"],
-        "queries": ["how do they support dementia people"],
-    }
-    result = await scrape_multiple_websites_implementation(test_case_2["urls"], test_case_2["queries"])
-    print(result)
+    except Exception as e:
+        return ToolMessage(
+            content=f"""❌ TOOL ERROR:
+📝 Called with parameters: {json.dumps(tool_call.get("args", {}), indent=2)}
+🚨 Error: {str(e)}
+
+Please try a different approach or tool.
+---""",
+            tool_call_id=str(uuid.uuid4())
+        )
+
+
+async def main():
+    # """Main function to test different URLs and search terms."""
+    
+    # # Test cases
+    # test_cases = [
+    #     {
+    #         "url": "comfortkeepers.com",
+    #         "search_queries":[ "veteran benefits, LA", "veteran benefits, LA" ],
+    #     },
+    # ]
+    
+    # for i, test_case in enumerate(test_cases, 1):
+    #     print(f"\n{'='*60}")
+    #     print(f"TEST {i}: {test_case['url']}")
+    #     print(f"{'='*60}")
         
+    #     result = await website_map(
+    #         url=test_case["url"],
+    #         search_queries=test_case["search_queries"],
+    #     )
+        
+    #     if result:
+    #         print(f"✅ Test {i} completed successfully")
+    #         print(result)
+    #     else:
+    #         print(f"❌ Test {i} failed")
+    # test_case_2 = {
+    #     "urls": ["https://www.comfortkeepers.com/offices/california/los-angeles/areas-served/area/inglewood/service/alzheimer's-and-dementia-care/"],
+    #     "queries": ["how do they support dementia people"],
+    # }
+    # result = await scrape_multiple_websites_implementation(test_case_2["urls"], test_case_2["queries"])
+    # print(result)
+    # Execute all tool calls concurrently
+    tool_calls = [{"args": {"url": "https://www.comfortkeepers.com/",
+    "search_queries": [
+      "dementia care",
+      "Alzheimer's care",
+      "services for dementia patients"
+    ]}}, {"args": {
+    "url": "https://www.visitingangels.com/",
+    "search_queries": [
+      "dementia care",
+      "Alzheimer's care",
+      "services for dementia patients"
+    ]
+  }}]
+    tool_messages = await asyncio.gather(*[execute_single_tool(tool_call) for tool_call in tool_calls])
+    
+    # Merge all tool messages into one with separators
+    merged_content = "\n\n" + "="*80 + "\n🔗 MERGED TOOL RESULTS\n" + "="*80 + "\n\n"
+    for i, tool_message in enumerate(tool_messages, 1):
+        merged_content += f"📋 RESULT {i}:\n" + "-"*40 + "\n"
+        merged_content += tool_message.content + "\n\n"
+    
+    final_message = ToolMessage(
+        content=merged_content,
+        tool_call_id=str(uuid.uuid4())
+    )
+    
+    print(final_message.content)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

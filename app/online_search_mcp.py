@@ -204,9 +204,9 @@ async def website_map(
                 endpoint,
                 headers=headers,
                 json=payload,
-                timeout=30
+                timeout=300
             )
-            
+            logger.info(response)
             # Check if request was successful
             response.raise_for_status()
             
