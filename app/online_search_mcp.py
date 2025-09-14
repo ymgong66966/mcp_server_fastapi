@@ -7,6 +7,7 @@ from fastmcp import FastMCP
 # from web_map_zilliz_trie import zilliz_url_trie
 from google_maps_api import GooglePlacesAPI
 from dotenv import load_dotenv
+from loguru import logger
 load_dotenv()
 online_mcp = FastMCP(name="online-search-mcp")
 
