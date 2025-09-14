@@ -26,3 +26,4 @@ langsmith
 # Data handling
 uuid
 loguru
+httpx
