@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import requests
+import httpx
 from typing import List, Dict, Any, Optional
 from fastmcp import FastMCP
 # from web_map_zilliz_trie import zilliz_url_trie
@@ -187,47 +188,65 @@ async def website_map(
         'Authorization': f'Bearer {api_key}'
     }
     
-    # Request payload
+    # Request payload with rate limiting
     result_urls = set()
     result_ls = []
-    for search in search_queries:
+
+    for i, search in enumerate(search_queries):
+        # Add delay between internal API calls to prevent 429 errors
+        if i > 0:  # No delay before first call
+            delay = 2.0  # Match LangGraph's rate limiting strategy
+            print(f"⏳ Internal rate limiting: waiting {delay}s before next Firecrawl API call")
+            await asyncio.sleep(delay)
+
         payload = {
             "url": url,
             "search": search,
             "limit": limit,
             "sitemap": sitemap
-    }
-    
+        }
+
         try:
-            
-            # Make the POST request
-            response = requests.post(
-                endpoint,
-                headers=headers,
-                json=payload,
-                timeout=300
-            )
-            logger.info(response)
-            # Check if request was successful
-            response.raise_for_status()
-            
-            # Parse JSON response
-            result = response.json()
-            for link in result['links']:
-                if link['url'] not in result_urls:
-                    result_urls.add(link['url'])
-                    result_ls.append(link)
-            
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Request Error: {e}")
-            return None
+            print(f"🔍 Making Firecrawl API call {i+1}/{len(search_queries)} for query: '{search}'")
+
+            # Make the POST request using httpx for async compatibility
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    endpoint,
+                    headers=headers,
+                    json=payload
+                )
+                logger.info(response)
+
+                # Check if request was successful
+                if response.status_code == 200:
+                    # Parse JSON response
+                    result = response.json()
+                    for link in result.get('links', []):
+                        if link['url'] not in result_urls:
+                            result_urls.add(link['url'])
+                            result_ls.append(link)
+                    print(f"✅ Successfully processed query '{search}' - found {len(result.get('links', []))} links")
+
+                elif response.status_code == 429:
+                    print(f"🚫 Rate limited (429) for query '{search}' - skipping this query")
+                    # Continue with next query instead of failing entire function
+                    continue
+                else:
+                    print(f"⚠️ API returned status {response.status_code} for query '{search}' - skipping")
+                    continue
+
+        except httpx.RequestError as e:
+            print(f"❌ Request Error for query '{search}': {e}")
+            # Continue with next query instead of failing entire function
+            continue
         except json.JSONDecodeError as e:
-            print(f"❌ JSON Decode Error: {e}")
+            print(f"❌ JSON Decode Error for query '{search}': {e}")
             print(f"Raw response: {response.text}")
-            return None
+            continue
         except Exception as e:
-            print(f"❌ Unexpected Error: {e}")
-            return None
+            print(f"❌ Unexpected Error for query '{search}': {e}")
+            continue
     
     return result_ls
 
