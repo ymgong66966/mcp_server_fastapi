@@ -2,6 +2,8 @@ import aiohttp
 import json
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
+from langchain_openai import ChatOpenAI
+from langchain.prompts import PromptTemplate
 
 class GooglePlacesAPI:
     """Async Google Places API client for searching nearby places, text search, and geocoding."""
@@ -10,14 +12,33 @@ class GooglePlacesAPI:
         self.api_key = api_key
         self.text_search_url = "https://places.googleapis.com/v1/places:searchText"
         self.geocoding_url = "https://maps.googleapis.com/maps/api/geocode/json"
+        self.prompt = """
+        You are a url parser for generating proper root urls for the firecrawl web_map funtion, where it smartly converses the subwebsites of a url. Your input is the url provided about something, the problem is that it can be too specific to be the root url used for web_map. You should know that the root url does not always mean the domain of the input url. For example, for the input url: 
+https://www.homeinstead.com/home-care/usa/ca/san-francisco/220/?utm_source=google&utm_medium=organic&utm_campaign=google_organic_businesslisting_y  . you actually need to keep the url up to 
+https://www.homeinstead.com/home-care/usa/ca/san-francisco Because it contains the geo-location of the url, which is useful information. But a lot of other times, you can just extract the web domain. Only the geo-location is important information to you.
+
+Make sure that you output is json format: {{"extracted_url":"the url you extacted"}}. Do not include any other text like "json", "output" than the json output.
+
+Here is your input url: {url}
+        """
     
     def extract_domain(self, url: str) -> Optional[str]:
         """Extract domain from a website URL."""
         try:
             if not url:
                 return None
-            parsed = urlparse(url)
-            return parsed.netloc.lower()
+            llm = ChatOpenAI(
+            temperature=0.1,
+            api_key=os.getenv("OPENAI_API_KEY", "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"),
+            model="gpt-4.1"
+        )
+            prompt = PromptTemplate.from_template(self.prompt)
+            chain = prompt | llm
+            result = chain.invoke({"url": url})
+            json_result = json.loads(result.content)
+            return json_result["extracted_url"]
+            # parsed = urlparse(url)
+            # return parsed.netloc.lower()
         except Exception:
             return None
     

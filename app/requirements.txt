@@ -12,8 +12,8 @@ aiohttp
 # Vector database and embeddings
 pymilvus
 langchain-community
-langchain-openai
-langchain
+langchain==0.2.16
+langchain-openai==0.1.25
 openai
 
 # Web scraping and APIs

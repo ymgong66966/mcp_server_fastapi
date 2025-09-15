@@ -218,19 +218,11 @@ async def main():
     # result = await scrape_multiple_websites_implementation(test_case_2["urls"], test_case_2["queries"])
     # print(result)
     # Execute all tool calls concurrently
-    tool_calls = [{"args": {"url": "https://www.comfortkeepers.com/",
+    tool_calls = [{"args": {"url": "https://www.homeinstead.com/home-care/usa/ca/san-francisco",
     "search_queries": [
       "dementia care",
       "Alzheimer's care",
-      "services for dementia patients"
-    ]}}, {"args": {
-    "url": "https://www.visitingangels.com/",
-    "search_queries": [
-      "dementia care",
-      "Alzheimer's care",
-      "services for dementia patients"
-    ]
-  }}]
+    ]}}]
     tool_messages = await asyncio.gather(*[execute_single_tool(tool_call) for tool_call in tool_calls])
     
     # Merge all tool messages into one with separators
