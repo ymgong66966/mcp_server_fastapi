@@ -38,7 +38,7 @@ class GooglePlacesAPI:
     async def search_text(
         self,
         text_query: str,
-        max_result_count: int = 10,
+        max_result_count: int = 3,
         field_mask: str = "places.displayName,places.formattedAddress,places.priceLevel,places.rating,places.location,places.websiteUri"
     ) -> Dict[str, Any]:
         """
@@ -81,7 +81,7 @@ class GooglePlacesAPI:
     async def search_text_with_websites(
         self,
         text_query: str,
-        max_result_count: int = 10
+        max_result_count: int = 3
     ) -> List[Dict[str, Any]]:
         """
         Search for places using text query and return enriched data with website domains.
@@ -108,7 +108,7 @@ class GooglePlacesAPI:
         self,
         location: str,
         location_query: str = "",
-        max_results: int = 10
+        max_results: int = 3
     ) -> List[Dict[str, Any]]:
         """
         Convenience method to search for restaurants using text query.
@@ -128,7 +128,7 @@ class GooglePlacesAPI:
             
         result = await self.search_text(
             text_query=query,
-            max_result_count=max_results
+            max_result_count=3
         )
         
         if "error" in result:

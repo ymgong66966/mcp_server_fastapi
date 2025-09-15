@@ -256,8 +256,3 @@ async def google_places_search(location: str, location_query: str = "") -> list[
     results = await api.search_restaurants_by_text(location, location_query)
     return results
     
-# async def website_map(domain: str, query: List[str]):
-#     """The purpose of this function is to retrieve relevant information from a website based on a user's query. The function takes a web domain and a list of queries as input and returns a list of relevant URLs."""
-#     print(domain, query, "domain and query")
-#     relevant_urls = await zilliz_url_trie(domain, query)
-#     return relevant_urls

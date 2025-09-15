@@ -41,7 +41,6 @@ async def readiness_check(request: Request) -> PlainTextResponse:
 
 # Mount the subserver (updated syntax to fix deprecation warning)
 mcp.mount(online_mcp, "/online")
-
 print(f"Mounted subservers: /online")
 
 # Keep the main function for running the FastMCP server
