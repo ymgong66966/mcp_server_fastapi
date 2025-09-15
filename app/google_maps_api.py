@@ -25,6 +25,7 @@ Here is your input url: {url}
     def extract_domain(self, url: str) -> Optional[str]:
         """Extract domain from a website URL."""
         try:
+            logger.info(url, "url")
             if not url:
                 return None
             llm = ChatOpenAI(
@@ -35,6 +36,7 @@ Here is your input url: {url}
             prompt = PromptTemplate.from_template(self.prompt)
             chain = prompt | llm
             result = chain.invoke({"url": url})
+            logger.info(result, "result")
             json_result = json.loads(result.content)
             return json_result["extracted_url"]
             # parsed = urlparse(url)
