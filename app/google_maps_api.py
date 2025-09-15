@@ -4,7 +4,7 @@ from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
-
+import os
 class GooglePlacesAPI:
     """Async Google Places API client for searching nearby places, text search, and geocoding."""
     
@@ -29,7 +29,7 @@ Here is your input url: {url}
                 return None
             llm = ChatOpenAI(
             temperature=0.1,
-            api_key=os.getenv("OPENAI_API_KEY", "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"),
+            api_key=os.getenv("OPENAI_API_KEY"),
             model="gpt-4.1"
         )
             prompt = PromptTemplate.from_template(self.prompt)
