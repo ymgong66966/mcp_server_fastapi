@@ -5,6 +5,8 @@ from urllib.parse import urlparse
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 import os
+from loguru import logger
+
 class GooglePlacesAPI:
     """Async Google Places API client for searching nearby places, text search, and geocoding."""
     
@@ -25,33 +27,34 @@ Here is your input url: {url}
     def extract_domain(self, url: str) -> Optional[str]:
         """Extract domain from a website URL."""
         try:
-            logger.info(url, "url")
+            print(url, "url")
+            logger.info(url)
             if not url:
                 return None
             llm = ChatOpenAI(
-            temperature=0.1,
-            api_key=os.getenv("OPENAI_API_KEY"),
-            model="gpt-4.1"
-        )
+                temperature=0.1,
+                api_key=os.getenv("OPENAI_API_KEY"),
+                model="gpt-4.1"
+            )
             prompt = PromptTemplate.from_template(self.prompt)
             chain = prompt | llm
             result = chain.invoke({"url": url})
-            logger.info(result, "result")
+            logger.info(result)
             json_result = json.loads(result.content)
             return json_result["extracted_url"]
-            # parsed = urlparse(url)
-            # return parsed.netloc.lower()
-        except Exception:
-            return None
+        except Exception as e:
+            return str(e)
     
     def enrich_places_with_domain(self, places: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Enrich places data with extracted domain information."""
         enriched_places = []
         for place in places:
             enriched_place = place.copy()
+            print(enriched_place, "place")
             website_uri = place.get('websiteUri')
             if website_uri:
                 domain = self.extract_domain(website_uri)
+                print(domain, "domain")
                 enriched_place['domain'] = domain
             else:
                 enriched_place['domain'] = None
@@ -158,6 +161,7 @@ Here is your input url: {url}
             return []
             
         places = result.get("places", [])
+
         return self.enrich_places_with_domain(places)
     
     async def geocode_address(self, address: str) -> Optional[tuple]:

@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional
 import os
 from langchain_core.messages import ToolMessage
 import uuid
-
+from google_maps_api import GooglePlacesAPI
 async def website_map(
     url: str = "https://firecrawl.dev",
     search_queries: list[str] = ["docs"],
@@ -217,26 +217,33 @@ async def main():
     # }
     # result = await scrape_multiple_websites_implementation(test_case_2["urls"], test_case_2["queries"])
     # print(result)
+
+
+    
     # Execute all tool calls concurrently
-    tool_calls = [{"args": {"url": "https://www.homeinstead.com/home-care/usa/ca/san-francisco",
-    "search_queries": [
-      "dementia care",
-      "Alzheimer's care",
-    ]}}]
-    tool_messages = await asyncio.gather(*[execute_single_tool(tool_call) for tool_call in tool_calls])
+    # tool_calls = [{"args": {"url": "https://www.homeinstead.com/home-care/usa/ca/san-francisco",
+    # "search_queries": [
+    #   "dementia care",
+    #   "Alzheimer's care",
+    # ]}}]
+    # tool_messages = await asyncio.gather(*[execute_single_tool(tool_call) for tool_call in tool_calls])
     
-    # Merge all tool messages into one with separators
-    merged_content = "\n\n" + "="*80 + "\n🔗 MERGED TOOL RESULTS\n" + "="*80 + "\n\n"
-    for i, tool_message in enumerate(tool_messages, 1):
-        merged_content += f"📋 RESULT {i}:\n" + "-"*40 + "\n"
-        merged_content += tool_message.content + "\n\n"
+    # # Merge all tool messages into one with separators
+    # merged_content = "\n\n" + "="*80 + "\n🔗 MERGED TOOL RESULTS\n" + "="*80 + "\n\n"
+    # for i, tool_message in enumerate(tool_messages, 1):
+    #     merged_content += f"📋 RESULT {i}:\n" + "-"*40 + "\n"
+    #     merged_content += tool_message.content + "\n\n"
     
-    final_message = ToolMessage(
-        content=merged_content,
-        tool_call_id=str(uuid.uuid4())
-    )
+    # final_message = ToolMessage(
+    #     content=merged_content,
+    #     tool_call_id=str(uuid.uuid4())
+    # )
     
-    print(final_message.content)
+    # print(final_message.content)
+
+    api = GooglePlacesAPI(api_key=os.getenv("GOOGLE_PLACES_API_KEY", "AIzaSyBkUXBC57tZH4xbPiLqqcuszmUH0VOfe8U"))
+    results = await api.search_restaurants_by_text("Los Angeles, CA", "dementia care")
+    print(results)
 
 
 if __name__ == "__main__":
