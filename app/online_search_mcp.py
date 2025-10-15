@@ -1,11 +1,9 @@
 import asyncio
 import json
 import os
-import requests
 import httpx
 from typing import List, Dict, Any, Optional
 from fastmcp import FastMCP
-# from web_map_zilliz_trie import zilliz_url_trie
 from google_maps_api import GooglePlacesAPI
 from dotenv import load_dotenv
 from loguru import logger
