@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 import httpx
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from fastmcp import FastMCP
 from google_maps_api import GooglePlacesAPI
 from dotenv import load_dotenv

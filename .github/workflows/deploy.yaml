@@ -128,6 +128,19 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Create/Update Kubernetes Secrets
+      run: |
+        echo "🔐 Creating/updating Kubernetes secrets for development..."
+        kubectl create secret generic mcp-api-keys \
+          --from-literal=FIRECRAWL_API_KEY="${{ secrets.FIRECRAWL_API_KEY }}" \
+          --from-literal=GOOGLE_PLACES_API_KEY="${{ secrets.GOOGLE_PLACES_API_KEY }}" \
+          --from-literal=ZILLIZ_URI="${{ secrets.ZILLIZ_URI }}" \
+          --from-literal=ZILLIZ_TOKEN="${{ secrets.ZILLIZ_TOKEN }}" \
+          --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+          --namespace ${{ env.NAMESPACE }}-dev \
+          --dry-run=client -o yaml | kubectl apply -f -
+        echo "✅ Kubernetes secrets created/updated successfully"
+
     - name: Deploy to Development
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
