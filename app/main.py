@@ -2,6 +2,7 @@ import asyncio
 import os
 from fastmcp import FastMCP
 from online_search_mcp import online_mcp
+from follow_up_mcp import follow_up_mcp
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
@@ -41,7 +42,8 @@ async def readiness_check(request: Request) -> PlainTextResponse:
 
 # Mount the subserver (updated syntax to fix deprecation warning)
 mcp.mount(online_mcp, "/online")
-print(f"Mounted subservers: /online")
+mcp.mount(follow_up_mcp, "/followup")
+print(f"Mounted subservers: /online, /followup")
 
 # Keep the main function for running the FastMCP server
 async def main():
