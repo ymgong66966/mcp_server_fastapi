@@ -48,6 +48,8 @@ spec:
           value: {{ .Values.app.awsRegion | default "us-east-2" | quote }}
         - name: WITHCARE_DDB_PREFIX
           value: {{ .Values.app.ddbPrefix | default "WithCare_" | quote }}
+        - name: WITHCARE_DDB_OFF
+          value: {{ .Values.app.ddbOff | default "0" | quote }}
         {{- range .Values.app.extraEnv }}
         - name: {{ .name }}
           value: {{ .value | quote }}

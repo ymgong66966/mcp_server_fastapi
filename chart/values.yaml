@@ -17,6 +17,7 @@ app:
   logLevel: "INFO"
   awsRegion: "us-east-2"
   ddbPrefix: "WithCare_"
+  ddbOff: "1"  # Set to "0" once cross-account DDB access is configured
   extraEnv: []
     # - name: OPENAI_API_KEY
     #   value: "your-openai-key-here"
