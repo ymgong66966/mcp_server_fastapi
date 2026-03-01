@@ -44,6 +44,10 @@ spec:
           value: {{ .Values.service.targetPort | quote }}
         - name: LOG_LEVEL
           value: {{ .Values.app.logLevel | quote }}
+        - name: AWS_REGION
+          value: {{ .Values.app.awsRegion | default "us-east-2" | quote }}
+        - name: WITHCARE_DDB_PREFIX
+          value: {{ .Values.app.ddbPrefix | default "WithCare_" | quote }}
         {{- range .Values.app.extraEnv }}
         - name: {{ .name }}
           value: {{ .value | quote }}

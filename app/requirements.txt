@@ -28,3 +28,8 @@ uuid
 loguru
 httpx
 anthropic
+
+# Memory framework dependencies
+boto3>=1.28.0
+pydantic>=2.0.0
+PyYAML>=6.0
