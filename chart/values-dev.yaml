@@ -14,6 +14,9 @@ service:
 app:
   host: "0.0.0.0"
   logLevel: "DEBUG"  # More verbose logging for development
+  awsRegion: "us-east-2"
+  ddbPrefix: "WithCare_"
+  ddbOff: "1"  # DDB disabled until cross-account access is configured
   extraEnv: []
   secrets:
     enabled: true
