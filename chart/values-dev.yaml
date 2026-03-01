@@ -1,6 +1,9 @@
 # Development configuration for mcp-server-fastapi
 replicaCount: 1
 
+serviceAccount:
+  name: "default"
+
 image:
   repository: ghcr.io/ymgong66966/mcp_server_fastapi
   tag: develop  # Will be overridden by GitHub Actions with SHA-based tag

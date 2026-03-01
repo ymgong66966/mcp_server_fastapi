@@ -1,5 +1,8 @@
 replicaCount: 1
 
+serviceAccount:
+  name: "mcp-server-sa"
+
 image:
   repository: ghcr.io/ymgong66966/mcp_server_fastapi
   tag: latest
@@ -17,8 +20,11 @@ app:
   logLevel: "INFO"
   awsRegion: "us-east-2"
   ddbPrefix: "WithCare_"
-  ddbOff: "1"  # Set to "0" once cross-account DDB access is configured
+  ddbOff: "0"  # DDB enabled — same-account access via IRSA
   extraEnv: []
+  secrets:
+    enabled: true
+    name: "mcp-api-keys"
     # - name: OPENAI_API_KEY
     #   value: "your-openai-key-here"
 
