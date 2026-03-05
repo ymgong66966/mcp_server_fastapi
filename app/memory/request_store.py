@@ -183,9 +183,11 @@ class RequestStore:
         """
         Query recent requests on the main table, optionally filtered by date.
 
-        Uses PK=USER#{user_id} with SK begins_with REQ#, then applies a
-        FilterExpression on created_at if after_date is provided.
-        Results are sorted by SK descending (most recent first).
+        Uses PK=USER#{user_id} with SK begins_with REQ#. Fetches all matching
+        items, sorts by created_at descending in Python, then applies the limit.
+        This avoids DDB's Limit being applied before FilterExpression and ensures
+        true chronological ordering (the main table SK is UUID-based, not
+        time-based).
         """
         if not self.dynamodb:
             logger.warning("DynamoDB client not configured, returning empty")
@@ -197,16 +199,24 @@ class RequestStore:
 
             query_kwargs: Dict[str, Any] = {
                 "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("REQ#"),
-                "ScanIndexForward": False,
-                "Limit": limit,
             }
 
             if after_date:
                 query_kwargs["FilterExpression"] = Attr("created_at").gte(after_date)
 
             response = table.query(**query_kwargs)
+            items = response.get("Items", [])
 
-            return [_format_request_summary(item) for item in response.get("Items", [])]
+            # Paginate if DDB returned a partial result set
+            while "LastEvaluatedKey" in response:
+                query_kwargs["ExclusiveStartKey"] = response["LastEvaluatedKey"]
+                response = table.query(**query_kwargs)
+                items.extend(response.get("Items", []))
+
+            # Sort by created_at descending (true chronological recency)
+            items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+
+            return [_format_request_summary(item) for item in items[:limit]]
 
         except Exception as e:
             logger.error(f"query_recent failed: {e}")
