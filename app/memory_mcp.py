@@ -25,6 +25,7 @@ from memory.memory_write_gate import (
 )
 from memory.models.fact_models import AliasRecord, ExtractedFact
 from memory.entity_inference import infer_subject_entity
+from memory.request_store import get_request_store
 
 logger = logging.getLogger(__name__)
 
@@ -422,3 +423,95 @@ async def memory_bind_facts(
         "needs_confirm": confirm_questions,
         "rejected_count": len(proposal.reject),
     }
+
+
+# ─── Tool 15: Get Requests by Status ─────────────────────────
+
+@memory_mcp.tool(
+    name="memory_get_requests_by_status",
+    description=(
+        "Query requests filtered by status. Use this when the user asks about "
+        "in-progress, queued, blocked, completed, or created requests. "
+        "Valid statuses: created, collecting, executing, paused, completed, cancelled. "
+        "Returns summaries sorted by most recently touched first. "
+        "Each summary includes: request_id, title, goal, status, request_type, "
+        "subject_entity_id, priority, created_at, last_touched_at, summary_current, stage_detail."
+    ),
+)
+async def memory_get_requests_by_status(
+    user_id: str,
+    status: str,
+    limit: int = 20,
+) -> list[dict]:
+    store = get_request_store()
+    return await store.query_by_status(user_id=user_id, status=status, limit=limit)
+
+
+# ─── Tool 16: Get Requests by Entity ─────────────────────────
+
+@memory_mcp.tool(
+    name="memory_get_requests_by_entity",
+    description=(
+        "Query requests related to a specific care recipient or entity. "
+        "Use this when the user asks 'How has mom been doing?' or 'What have we "
+        "done for dad?'. The entity_id should be a canonical entity identifier "
+        "like 'care_recipient:mom' or 'care_recipient:dad'. "
+        "Optionally filter to requests after a given ISO date (e.g. '2025-12-01T00:00:00'). "
+        "Returns summaries sorted by most recently touched first."
+    ),
+)
+async def memory_get_requests_by_entity(
+    entity_id: str,
+    limit: int = 20,
+    after_date: Optional[str] = None,
+) -> list[dict]:
+    store = get_request_store()
+    return await store.query_by_entity(
+        entity_id=entity_id, limit=limit, after_date=after_date,
+    )
+
+
+# ─── Tool 17: Get Request Detail ─────────────────────────────
+
+@memory_mcp.tool(
+    name="memory_get_request_detail",
+    description=(
+        "Get full detail for a single request by its request_id. "
+        "Use this when the user asks for more information about a specific request, "
+        "or when you need to inspect slots, open_questions, or artifacts. "
+        "Returns the complete request record including payload, slots, "
+        "open_questions, artifacts, prereq_gate, and audit trail."
+    ),
+)
+async def memory_get_request_detail(
+    user_id: str,
+    request_id: str,
+) -> dict:
+    store = get_request_store()
+    result = await store.get_request(user_id=user_id, request_id=request_id)
+    if result is None:
+        return {"error": "not_found", "message": f"Request {request_id} not found"}
+    return result
+
+
+# ─── Tool 18: List Recent Requests ───────────────────────────
+
+@memory_mcp.tool(
+    name="memory_list_recent_requests",
+    description=(
+        "List recent requests for a user, optionally filtered to a date range. "
+        "Use this when the user asks 'What did you help me with last month?' or "
+        "'Show me my recent requests'. Pass after_date as an ISO timestamp "
+        "(e.g. '2025-12-01T00:00:00') to filter by creation date. "
+        "Returns summaries sorted by most recent first."
+    ),
+)
+async def memory_list_recent_requests(
+    user_id: str,
+    limit: int = 20,
+    after_date: Optional[str] = None,
+) -> list[dict]:
+    store = get_request_store()
+    return await store.query_recent(
+        user_id=user_id, limit=limit, after_date=after_date,
+    )
