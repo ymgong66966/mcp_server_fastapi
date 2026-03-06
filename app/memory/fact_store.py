@@ -298,6 +298,35 @@ class FactStore:
         await self.put_fact(new_fact)
         return new_fact
 
+    async def get_user_entities(self, user_id: str) -> List[str]:
+        """Get all distinct entity_ids that have active facts for a user."""
+        if not self.dynamodb:
+            return []
+
+        try:
+            table = self._fact_table()
+            response = table.scan(
+                FilterExpression=(
+                    Attr("pk").begins_with(f"USER#{user_id}#ENT#")
+                    & Attr("status").eq("active")
+                ),
+                ProjectionExpression="pk",
+            )
+
+            entities = set()
+            for item in response.get("Items", []):
+                pk = item.get("pk", "")
+                # pk format: USER#{user_id}#ENT#{entity_id}
+                parts = pk.split("#ENT#", 1)
+                if len(parts) == 2 and parts[1]:
+                    entities.add(parts[1])
+
+            return sorted(entities)
+
+        except Exception as e:
+            logger.error(f"Failed to get user entities: {e}")
+            return []
+
     async def get_all_active_facts_for_user(
         self,
         user_id: str,

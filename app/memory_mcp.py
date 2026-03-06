@@ -10,8 +10,10 @@ Mounted into the main FastMCP server via main.py.
 
 import json
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
+from anthropic import Anthropic
 from fastmcp import FastMCP
 
 from memory.context_bundle import get_context_bundle, bundle_to_prompt_block
@@ -515,3 +517,301 @@ async def memory_list_recent_requests(
     return await store.query_recent(
         user_id=user_id, limit=limit, after_date=after_date,
     )
+
+
+# ═══════════════════════════════════════════════════════════════
+# Change 1: Schema Resource
+# ═══════════════════════════════════════════════════════════════
+
+_WITHCARE_SCHEMA = """\
+# WithCare DynamoDB Table Schemas
+
+## WithCare_UserRequestTable
+- **PK**: `USER#{user_id}`
+- **SK**: `REQ#{created_at}#{request_id}`
+- **GSI1** (by status): PK=`USER#{user_id}#STATUS#{status}`, SK=`LAST#{timestamp}#REQ#{request_id}`
+- **GSI2** (by entity): PK=`RECIPIENT#{entity_id}`, SK=`LAST#{timestamp}#REQ#{request_id}`
+- **Fields**: request_id, title, goal, status, request_type, subject_entity_id, priority, created_at, last_touched_at, summary_current, stage_detail, name, target
+- **Valid statuses**: created, collecting, executing, paused, completed, cancelled
+
+## WithCare_UserFactTable
+- **PK**: `USER#{user_id}#ENT#{entity_id}`
+- **SK**: `FACT#{fact_key}#TS#{timestamp}#{fact_id}`
+- **GSI1**: by entity+key+status
+- **GSI2**: all active facts for user (scan with filter)
+- **Fields**: fact_id, user_id, entity_id, fact_key, fact_label, value, value_type, status, confidence, verification_level, source_type, source_ref, evidence, created_at, updated_at
+
+## WithCare_UserEventTable
+- **PK**: `USER#{user_id}`
+- **SK**: `EVT#{timestamp}#{event_id}`
+- **Fields**: event_id, user_id, event_type, content, request_id, care_recipient_id, structured, tags, timestamp, ttl
+- **Event types**: dialogue_summary, tool_result, escalation, decision, memory_candidate, error
+
+## WithCare_UserConversationTable
+- **PK**: `CONV#{conversation_id}`
+- **SK**: `MSG#{timestamp}#{message_id}`
+- **GSI1**: PK=`USER#{user_id}#DATE#{YYYY-MM-DD}`, SK=`MSG#{timestamp}#{message_id}`
+
+## Entity ID Format
+- `care_recipient:mom`, `care_recipient:dad`, `care_recipient:grandparent`, `care_recipient:spouse`
+- `user:self`
+- Custom entities follow same pattern: `care_recipient:{label}`
+
+## Available Query Methods
+
+### requests table
+- `query_recent(limit, after_date?)` — recent requests, optionally filtered by ISO date
+- `query_by_entity(entity_id, limit, after_date?)` — requests for a care recipient
+- `query_by_status(status, limit)` — requests filtered by status
+- `get_request(request_id)` — single request full detail
+
+### facts table
+- `get_active_facts(entity_id, fact_keys?)` — active facts for an entity
+- `get_user_entities()` — all distinct entity_ids with active facts for the user
+- `get_all_active_facts_for_user()` — all active facts across all entities
+
+### events table
+- `get_recent_events(limit, event_types?)` — recent events, optionally filtered by type
+- `get_events_for_request(request_id, limit)` — events for a specific request
+"""
+
+
+@memory_mcp.resource("schema://withcare-tables")
+def withcare_table_schemas() -> str:
+    """Return comprehensive DynamoDB schema documentation for all WithCare tables."""
+    return _WITHCARE_SCHEMA
+
+
+# ═══════════════════════════════════════════════════════════════
+# Change 2: Query Planner Tool
+# ═══════════════════════════════════════════════════════════════
+
+_QUERY_PLANNER_SYSTEM = """\
+You are a query planner for a caregiving platform's DynamoDB memory system.
+Given a user's natural-language question and the database schema, generate a structured query plan.
+
+SCHEMA:
+{schema}
+
+RULES:
+1. Entity resolution: "my mom" → care_recipient:mom, "my dad" → care_recipient:dad, \
+"my grandmother/grandma/grandfather/grandpa" → care_recipient:grandparent, \
+"my spouse/husband/wife" → care_recipient:spouse, "myself/me" → user:self
+2. Date extraction: "last January" → after_date=YYYY-01-01T00:00:00, "last month" → compute relative date, \
+"last year" → after_date=(current_year-1)-01-01T00:00:00
+3. Use the most specific method available. Prefer query_by_entity over query_recent when an entity is mentioned.
+4. Generate 1-3 steps. Each step is a query against one table.
+5. For comparison questions ("compare now vs last year"), use multiple steps with different date ranges.
+6. Set needs_followup=true ONLY if you expect the first batch of results to be insufficient and a second round \
+of queries would be needed (e.g., you need IDs from the first result to query details).
+
+OUTPUT FORMAT (strict JSON, no markdown):
+{{
+  "reasoning": "brief explanation of your plan",
+  "needs_followup": false,
+  "steps": [
+    {{
+      "step_id": 1,
+      "description": "human-readable description",
+      "table": "requests|facts|events",
+      "method": "method_name",
+      "params": {{...}}
+    }}
+  ]
+}}
+"""
+
+
+@memory_mcp.tool(
+    name="memory_query_planner",
+    description=(
+        "LLM-driven query planner: given a user's natural-language question about their "
+        "care history, generates a structured query plan (1-3 steps) specifying which "
+        "tables and methods to call. Use this instead of manually choosing query tools "
+        "when the user's question is complex or ambiguous."
+    ),
+)
+async def memory_query_planner(
+    user_question: str,
+    user_id: str,
+    known_entity_ids: list[str] = [],
+    previous_results_summary: str = "",
+) -> dict:
+    """Generate a structured query plan from a natural-language question."""
+    anthropic_client = Anthropic()
+
+    entity_context = ""
+    if known_entity_ids:
+        entity_context = f"\nKnown entities for this user: {', '.join(known_entity_ids)}"
+
+    previous_context = ""
+    if previous_results_summary:
+        previous_context = (
+            f"\n\nPREVIOUS RESULTS (from earlier query round):\n{previous_results_summary}"
+            "\nGenerate additional queries to fill gaps, or return empty steps if sufficient."
+        )
+
+    user_prompt = (
+        f"User question: {user_question}\n"
+        f"User ID: {user_id}"
+        f"{entity_context}"
+        f"{previous_context}"
+        "\n\nGenerate the query plan as JSON."
+    )
+
+    try:
+        response = anthropic_client.messages.create(
+            model=os.environ.get("PLANNER_MODEL", "claude-sonnet-4-20250514"),
+            max_tokens=1024,
+            system=_QUERY_PLANNER_SYSTEM.format(schema=_WITHCARE_SCHEMA),
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+
+        text = response.content[0].text.strip()
+        # Strip markdown fences if present
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+            if text.endswith("```"):
+                text = text[:-3].strip()
+
+        plan = json.loads(text)
+        return plan
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Query planner returned invalid JSON: {e}")
+        return {"reasoning": "planner_json_error", "steps": [], "needs_followup": False}
+    except Exception as e:
+        logger.error(f"Query planner failed: {e}")
+        return {"reasoning": f"planner_error: {e}", "steps": [], "needs_followup": False}
+
+
+# ═══════════════════════════════════════════════════════════════
+# Change 3: Query Executor Tool
+# ═══════════════════════════════════════════════════════════════
+
+@memory_mcp.tool(
+    name="memory_execute_query",
+    description=(
+        "Execute a single structured query against any WithCare DynamoDB table. "
+        "Typically called with steps from memory_query_planner. "
+        "Specify the table (requests/facts/events), method name, and params dict."
+    ),
+)
+async def memory_execute_query(
+    user_id: str,
+    table: str,
+    method: str,
+    params: dict,
+) -> dict:
+    """Generic query executor that dispatches to the appropriate store method."""
+    request_store = get_request_store()
+    fact_store = get_fact_store()
+    event_store = get_event_store()
+
+    dispatch = {
+        ("requests", "query_recent"): lambda p: request_store.query_recent(user_id=user_id, **p),
+        ("requests", "query_by_entity"): lambda p: request_store.query_by_entity(**p),
+        ("requests", "query_by_status"): lambda p: request_store.query_by_status(user_id=user_id, **p),
+        ("requests", "get_request"): lambda p: request_store.get_request(user_id=user_id, **p),
+        ("facts", "get_active_facts"): lambda p: fact_store.get_active_facts(user_id=user_id, **p),
+        ("facts", "get_user_entities"): lambda p: fact_store.get_user_entities(user_id=user_id),
+        ("facts", "get_all_active_facts_for_user"): lambda p: fact_store.get_all_active_facts_for_user(user_id=user_id),
+        ("events", "get_recent_events"): lambda p: event_store.get_recent_events(user_id=user_id, **p),
+        ("events", "get_events_for_request"): lambda p: event_store.get_events_for_request(user_id=user_id, **p),
+    }
+
+    handler = dispatch.get((table, method))
+    if handler is None:
+        return {
+            "error": "unknown_dispatch",
+            "message": f"Unknown table/method combination: {table}/{method}",
+            "valid_combinations": [f"{t}/{m}" for t, m in dispatch.keys()],
+        }
+
+    try:
+        result = await handler(params)
+
+        # Normalize result to a list of dicts for consistent output
+        if result is None:
+            items = []
+        elif isinstance(result, list):
+            items = [
+                r.model_dump(mode="json") if hasattr(r, "model_dump") else r
+                for r in result
+            ]
+        elif isinstance(result, dict):
+            items = [result]
+        else:
+            items = [{"value": str(result)}]
+
+        return {
+            "table": table,
+            "method": method,
+            "result_count": len(items),
+            "results": items,
+        }
+
+    except Exception as e:
+        logger.error(f"memory_execute_query failed ({table}/{method}): {e}")
+        return {
+            "error": "execution_failed",
+            "table": table,
+            "method": method,
+            "message": str(e),
+        }
+
+
+# ═══════════════════════════════════════════════════════════════
+# Change 4: Query Strategy Prompt
+# ═══════════════════════════════════════════════════════════════
+
+@memory_mcp.prompt(name="withcare_query_strategy")
+def withcare_query_strategy(user_question: str) -> str:
+    """Teach the LLM how to decompose complex memory questions into query steps."""
+    return f"""\
+You need to answer the following user question using the WithCare memory system:
+
+"{user_question}"
+
+## Query Strategy Guide
+
+### Entity Resolution
+- "my mom/mother" → entity_id = care_recipient:mom
+- "my dad/father" → entity_id = care_recipient:dad
+- "my grandma/grandmother/grandpa/grandfather" → entity_id = care_recipient:grandparent
+- "my spouse/husband/wife" → entity_id = care_recipient:spouse
+- "myself/me/my own" → entity_id = user:self
+
+### Date Range Extraction
+- "last January" → after_date = (current_year - 1 if current month <= January else current_year)-01-01T00:00:00
+- "last month" → compute ISO date for first day of previous month
+- "last year" → after_date = (current_year - 1)-01-01T00:00:00
+- "recently" or "latest" → no date filter, just use limit
+
+### Choosing the Right Table & Method
+1. **User asks about requests/tasks/what they did**: Use `requests` table
+   - For a specific person: `query_by_entity` with entity_id
+   - For a status filter: `query_by_status` with status
+   - For general recent: `query_recent` with optional after_date
+   - For a specific request detail: `get_request` with request_id
+
+2. **User asks about a person's profile/condition/situation**: Use `facts` table
+   - For one entity: `get_active_facts` with entity_id
+   - For all entities: `get_all_active_facts_for_user`
+
+3. **User asks about what happened during a request**: Use `events` table
+   - For a specific request: `get_events_for_request` with request_id
+   - For recent activity: `get_recent_events` with optional event_types filter
+
+### Multi-Table Queries
+- "How is mom doing?" → facts/get_active_facts + requests/query_by_entity (2 steps)
+- "Compare mom's situation now vs last year" → facts/get_active_facts + requests/query_by_entity (recent) + requests/query_by_entity (last year) (3 steps)
+- "What requests have I made for my mom?" → requests/query_by_entity (1 step)
+
+### When to Use Follow-Up Rounds
+- When you need a request_id from results to fetch events or details
+- When initial results are empty and you want to broaden the search
+- NOT needed for straightforward single-table queries
+
+Use memory_query_planner to generate the plan, then memory_execute_query to run each step.
+"""
