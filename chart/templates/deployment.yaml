@@ -88,6 +88,18 @@ spec:
               key: ANTHROPIC_API_KEY
         - name: DOMAIN_MAPPING_PATH
           value: "/tmp/domain_uuid_mapping.pkl"
+        - name: DELIVER_NAVIGATOR_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.app.secrets.name }}
+              key: DELIVER_NAVIGATOR_URL
+              optional: true
+        - name: LAMBDA_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.app.secrets.name }}
+              key: LAMBDA_API_KEY
+              optional: true
         {{- end }}
         livenessProbe:
           httpGet:
