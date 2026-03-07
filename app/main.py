@@ -6,6 +6,7 @@ from fastmcp.server.providers import FileSystemProvider
 from online_search_mcp import online_mcp
 from follow_up_mcp import follow_up_mcp
 from memory_mcp import memory_mcp
+from escalation_mcp import escalation_mcp
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
@@ -38,7 +39,8 @@ async def readiness_check(request: Request) -> PlainTextResponse:
 mcp.mount(online_mcp)
 mcp.mount(follow_up_mcp)
 mcp.mount(memory_mcp)
-print("Mounted sub-servers: online_mcp, follow_up_mcp, memory_mcp")
+mcp.mount(escalation_mcp)
+print("Mounted sub-servers: online_mcp, follow_up_mcp, memory_mcp, escalation_mcp")
 
 # --- Optional: Namespace transform example (commented out) ---
 # To namespace-prefix tools from a sub-server (e.g., "online_" prefix):
