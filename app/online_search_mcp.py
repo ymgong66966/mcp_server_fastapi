@@ -71,39 +71,39 @@ Not recommended for: when you only have a web domain or company front web page a
 )
 async def scrape_multiple_websites_implementation(urls: list[str], queries: list[str]) -> list[dict]:
     """Direct Firecrawl API scraping implementation using proper Firecrawl methods."""
-    
+
     # Input validation
     if not urls:
         return [{"error": "No URLs provided"}]
     if not queries:
         return [{"error": "No queries provided"}]
-    
-    # Limit concurrent requests to avoid overwhelming servers
-    MAX_CONCURRENT = 5
-    if len(urls) > MAX_CONCURRENT:
-        urls = urls[:MAX_CONCURRENT]
-    
+
+    # Limit URLs to avoid excessive API calls
+    MAX_URLS = 5
+    if len(urls) > MAX_URLS:
+        urls = urls[:MAX_URLS]
+
     try:
         from firecrawl import Firecrawl
         from pydantic import BaseModel
-        
+
         # Define the schema using Pydantic
         class QueryResponse(BaseModel):
             queries: str
             answer: str
-        
-        # Initialize Firecrawl client with default API key
+
+        # Initialize Firecrawl client
         app = Firecrawl(api_key=os.getenv("FIRECRAWL_API_KEY", "fc-4e2dd3f9580f4c9094fd3ef5d2a02d97"))
-        
+
         extract_prompt = (
             f"queries: {str(queries)}\n"
             "answer: answer with the information you get from the website. "
             "if cannot find answer, return 'answer not found'"
         )
-        async def scrape_single_url(url: str) -> dict:
-            """Scrape a single URL with error handling."""
+
+        def _scrape_sync(url: str) -> dict:
+            """Synchronous scrape for a single URL (runs in thread executor)."""
             try:
-                # Use Firecrawl scrape with JSON extraction
                 result = app.scrape(
                     url,
                     formats=[{
@@ -112,48 +112,52 @@ async def scrape_multiple_websites_implementation(urls: list[str], queries: list
                         "prompt": extract_prompt
                     }],
                     only_main_content=True,
-                    timeout=30000
+                    timeout=30000,
                 )
-                
+
                 if result and hasattr(result, 'json') and result.json:
                     return {
                         "url": url,
                         "status": "success",
-                        "content": result.json
+                        "content": result.json,
                     }
                 else:
                     return {
                         "url": url,
                         "status": "error",
-                        "error": "No content extracted"
+                        "error": "No content extracted",
                     }
-                    
             except Exception as e:
                 return {
                     "url": url,
                     "status": "error",
-                    "error": str(e)
+                    "error": str(e),
                 }
 
-        # Process URLs concurrently
-        tasks = [scrape_single_url(url) for url in urls]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Handle any exceptions from gather
+        # Process URLs sequentially with rate-limiting delays.
+        # Firecrawl SDK's scrape() is synchronous — run each call in a
+        # thread executor so it doesn't block the event loop, and add a
+        # 2-second delay between calls to avoid 429 / connection errors.
+        loop = asyncio.get_event_loop()
         processed_results = []
-        for i, result in enumerate(results):
-            if result["status"] != "success":
-                processed_results.append({
-                    "url": urls[i],
-                    "status": "error",
-                    "error": f"Task failed: {str(result)}"
-                })
-            else:
+
+        for i, url in enumerate(urls):
+            if i > 0:
+                await asyncio.sleep(2.0)
+
+            logger.info(f"Scraping URL {i+1}/{len(urls)}: {url}")
+            result = await loop.run_in_executor(None, _scrape_sync, url)
+
+            if result["status"] == "success":
                 if "answer not found" not in result["content"]["answer"].lower():
                     processed_results.append(result)
-        
-        return processed_results
-        
+                else:
+                    logger.info(f"Skipping {url}: answer not found")
+            else:
+                logger.warning(f"Scrape failed for {url}: {result.get('error', 'unknown')}")
+
+        return processed_results if processed_results else {}
+
     except Exception as e:
         return [{"error": f"Scraping setup failed: {str(e)}"}]
 
