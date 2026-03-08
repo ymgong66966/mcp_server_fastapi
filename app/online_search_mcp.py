@@ -134,27 +134,24 @@ async def scrape_multiple_websites_implementation(urls: list[str], queries: list
                     "error": str(e),
                 }
 
-        # Process URLs sequentially with rate-limiting delays.
         # Firecrawl SDK's scrape() is synchronous — run each call in a
-        # thread executor so it doesn't block the event loop, and add a
-        # 2-second delay between calls to avoid 429 / connection errors.
+        # thread executor so it doesn't block the MCP server's event loop.
         loop = asyncio.get_event_loop()
+        tasks = [loop.run_in_executor(None, _scrape_sync, url) for url in urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         processed_results = []
-
-        for i, url in enumerate(urls):
-            if i > 0:
-                await asyncio.sleep(2.0)
-
-            logger.info(f"Scraping URL {i+1}/{len(urls)}: {url}")
-            result = await loop.run_in_executor(None, _scrape_sync, url)
-
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.warning(f"Scrape failed for {urls[i]}: {result}")
+                continue
             if result["status"] == "success":
                 if "answer not found" not in result["content"]["answer"].lower():
                     processed_results.append(result)
                 else:
-                    logger.info(f"Skipping {url}: answer not found")
+                    logger.info(f"Skipping {urls[i]}: answer not found")
             else:
-                logger.warning(f"Scrape failed for {url}: {result.get('error', 'unknown')}")
+                logger.warning(f"Scrape failed for {urls[i]}: {result.get('error', 'unknown')}")
 
         return processed_results if processed_results else {}
 
