@@ -153,7 +153,7 @@ async def scrape_multiple_websites_implementation(urls: list[str], queries: list
             else:
                 logger.warning(f"Scrape failed for {urls[i]}: {result.get('error', 'unknown')}")
 
-        return processed_results if processed_results else {}
+        return processed_results if processed_results else []
 
     except Exception as e:
         return [{"error": f"Scraping setup failed: {str(e)}"}]
