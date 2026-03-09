@@ -207,7 +207,7 @@ async def get_context_bundle(
     entity_id = ""
     needed_namespaces: List[str] = []
     if request_dict:
-        entity_id = request_dict.get("subject_entity_id") or "care_recipient:unknown"
+        entity_id = request_dict.get("subject_entity_id") or ""
         request_type = request_dict.get("request_type") or ""
         if request_type:
             needed_namespaces = _get_needed_fact_keys(request_type)

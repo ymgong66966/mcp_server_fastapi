@@ -463,13 +463,14 @@ async def memory_get_requests_by_status(
     ),
 )
 async def memory_get_requests_by_entity(
+    user_id: str,
     entity_id: str,
     limit: int = 20,
     after_date: Optional[str] = None,
 ) -> list[dict]:
     store = get_request_store()
     return await store.query_by_entity(
-        entity_id=entity_id, limit=limit, after_date=after_date,
+        entity_id=entity_id, user_id=user_id, limit=limit, after_date=after_date,
     )
 
 
