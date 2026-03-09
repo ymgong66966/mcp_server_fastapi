@@ -710,7 +710,7 @@ async def memory_execute_query(
 
     dispatch = {
         ("requests", "query_recent"): lambda p: request_store.query_recent(user_id=user_id, **p),
-        ("requests", "query_by_entity"): lambda p: request_store.query_by_entity(**p),
+        ("requests", "query_by_entity"): lambda p: request_store.query_by_entity(user_id=user_id, **p),
         ("requests", "query_by_status"): lambda p: request_store.query_by_status(user_id=user_id, **p),
         ("requests", "get_request"): lambda p: request_store.get_request(user_id=user_id, **p),
         ("facts", "get_active_facts"): lambda p: fact_store.get_active_facts(user_id=user_id, **p),
