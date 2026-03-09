@@ -108,6 +108,7 @@ class RequestStore:
     async def query_by_entity(
         self,
         entity_id: str,
+        user_id: str = "",
         limit: int = 20,
         after_date: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
@@ -116,6 +117,9 @@ class RequestStore:
 
         GSI2 PK: RECIPIENT#{entity_id}
         GSI2 SK: LAST#{timestamp}#REQ#{request_id}
+
+        If user_id is provided, results are filtered to only that user's
+        requests (GSI2 is partitioned by entity, not user).
         """
         if not self.dynamodb:
             logger.warning("DynamoDB client not configured, returning empty")
@@ -129,12 +133,18 @@ class RequestStore:
             if after_date:
                 key_cond = key_cond & Key("gsi2sk").gte(f"LAST#{after_date}")
 
-            response = table.query(
-                IndexName=GSI2_NAME,
-                KeyConditionExpression=key_cond,
-                ScanIndexForward=False,
-                Limit=limit,
-            )
+            query_kwargs = {
+                "IndexName": GSI2_NAME,
+                "KeyConditionExpression": key_cond,
+                "ScanIndexForward": False,
+                "Limit": limit,
+            }
+
+            if user_id:
+                from boto3.dynamodb.conditions import Attr
+                query_kwargs["FilterExpression"] = Attr("user_id").eq(user_id)
+
+            response = table.query(**query_kwargs)
 
             return [_format_request_summary(item) for item in response.get("Items", [])]
 
