@@ -42,14 +42,23 @@ def _format_results(data: dict, include_raw: bool = False) -> list[dict]:
         })
 
     for r in data.get("results", []):
+        # Use the cleaned content snippet (typically 1-2K chars of relevant text).
+        # For deep search, also include first 3000 chars of raw_content (markdown)
+        # for richer detail, but skip if it's too noisy.
+        content = r.get("content", "")
         item = {
             "url": r.get("url", ""),
             "title": r.get("title", ""),
-            "content": r.get("content", ""),
+            "content": content,
             "score": r.get("score", 0),
         }
         if include_raw and r.get("raw_content"):
-            item["raw_content"] = r["raw_content"][:5000]
+            raw = r["raw_content"]
+            # Only include raw_content if it's reasonably sized and adds value
+            # beyond the snippet. Skip huge pages (>10K) as they're likely full
+            # page dumps that would overwhelm the LLM context.
+            if len(raw) <= 10000:
+                item["raw_content_excerpt"] = raw[:3000]
         output.append(item)
 
     return output
