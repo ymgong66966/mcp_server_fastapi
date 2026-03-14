@@ -141,6 +141,9 @@ jobs:
           --from-literal=ZILLIZ_TOKEN="${{ secrets.ZILLIZ_TOKEN }}" \
           --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
           --from-literal=ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+          --from-literal=TAVILY_API_KEY="${{ secrets.TAVILY_API_KEY }}" \
+          --from-literal=DELIVER_NAVIGATOR_URL="${{ secrets.DELIVER_NAVIGATOR_URL }}" \
+          --from-literal=LAMBDA_API_KEY="${{ secrets.LAMBDA_API_KEY }}" \
           --namespace ${{ env.NAMESPACE }}-dev \
           --dry-run=client -o yaml | kubectl apply -f -
         echo "✅ Kubernetes secrets created/updated successfully"
@@ -226,6 +229,9 @@ jobs:
           --from-literal=ZILLIZ_TOKEN="${{ secrets.ZILLIZ_TOKEN }}" \
           --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
           --from-literal=ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+          --from-literal=TAVILY_API_KEY="${{ secrets.TAVILY_API_KEY }}" \
+          --from-literal=DELIVER_NAVIGATOR_URL="${{ secrets.DELIVER_NAVIGATOR_URL }}" \
+          --from-literal=LAMBDA_API_KEY="${{ secrets.LAMBDA_API_KEY }}" \
           --namespace ${{ env.NAMESPACE }} \
           --dry-run=client -o yaml | kubectl apply -f -
         echo "✅ Kubernetes secrets created/updated successfully"
