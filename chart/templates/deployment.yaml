@@ -100,6 +100,12 @@ spec:
               name: {{ .Values.app.secrets.name }}
               key: LAMBDA_API_KEY
               optional: true
+        - name: TAVILY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.app.secrets.name }}
+              key: TAVILY_API_KEY
+              optional: true
         {{- end }}
         livenessProbe:
           httpGet:
