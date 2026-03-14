@@ -131,6 +131,12 @@ async def tavily_search_deep(
             payload["exclude_domains"] = exclude_domains
 
         data = await _tavily_request("search", payload, timeout=60.0)
-        return _format_results(data, include_raw=True)
+        results = _format_results(data, include_raw=True)
+        answer = data.get("answer", "")
+        print(f"[tavily_search_deep] query={query[:80]!r}, results={len(data.get('results', []))}, answer_len={len(answer)}, total_items={len(results)}")
+        for r in data.get("results", []):
+            print(f"  - {r.get('url', '')[:60]} | content={len(r.get('content', ''))} chars | raw={len(r.get('raw_content', '') or '')} chars | score={r.get('score', 0)}")
+        return results
     except Exception as e:
+        print(f"[tavily_search_deep] ERROR: {e}")
         return [{"error": f"Tavily deep search failed: {str(e)}"}]
