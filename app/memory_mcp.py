@@ -594,16 +594,26 @@ Given a user's natural-language question and the database schema, generate a str
 SCHEMA:
 {schema}
 
-RULES:
-1. Entity resolution: "my mom" → care_recipient:mom, "my dad" → care_recipient:dad, \
-"my grandmother/grandma/grandfather/grandpa" → care_recipient:grandparent, \
-"my spouse/husband/wife" → care_recipient:spouse, "myself/me" → user:self
-2. Date extraction: "last January" → after_date=YYYY-01-01T00:00:00, "last month" → compute relative date, \
+ENTITY RESOLUTION:
+Use the "Known entities" section in the user prompt to determine which entity the question is about.
+Each entity has an ID (e.g., care_recipient:dad) and may include metadata like name, relationship, and isSelf.
+
+Important rules:
+- If an entity has isSelf=true, it means the USER IS the care recipient (they manage care for themselves).
+  When such a user says "me", "my care", "about me", "my situation" → query that care_recipient entity,
+  NOT user:self. user:self only stores caregiver-specific data (burnout, stress scores).
+- If no isSelf entity exists, "me/myself" → user:self (caregiver data).
+- Match the user's language to the entity: "my dad" → care_recipient:dad, "my mom" → care_recipient:mom, etc.
+- When the user asks a broad question ("what do you know about me?"), query ALL known entities to give a
+  complete picture. Use multiple steps — one per entity.
+
+OTHER RULES:
+1. Date extraction: "last January" → after_date=YYYY-01-01T00:00:00, "last month" → compute relative date, \
 "last year" → after_date=(current_year-1)-01-01T00:00:00
-3. Use the most specific method available. Prefer query_by_entity over query_recent when an entity is mentioned.
-4. Generate 1-3 steps. Each step is a query against one table.
-5. For comparison questions ("compare now vs last year"), use multiple steps with different date ranges.
-6. Set needs_followup=true ONLY if you expect the first batch of results to be insufficient and a second round \
+2. Use the most specific method available. Prefer query_by_entity over query_recent when an entity is mentioned.
+3. Generate 1-5 steps. Each step is a query against one table.
+4. For comparison questions ("compare now vs last year"), use multiple steps with different date ranges.
+5. Set needs_followup=true ONLY if you expect the first batch of results to be insufficient and a second round \
 of queries would be needed (e.g., you need IDs from the first result to query details).
 
 OUTPUT FORMAT (strict JSON, no markdown):
@@ -636,6 +646,7 @@ async def memory_query_planner(
     user_question: str,
     user_id: str,
     known_entity_ids: list[str] = [],
+    entity_metadata: Optional[dict] = None,
     previous_results_summary: str = "",
 ) -> dict:
     """Generate a structured query plan from a natural-language question."""
@@ -643,7 +654,22 @@ async def memory_query_planner(
 
     entity_context = ""
     if known_entity_ids:
-        entity_context = f"\nKnown entities for this user: {', '.join(known_entity_ids)}"
+        meta = entity_metadata or {}
+        entity_lines = []
+        for eid in known_entity_ids:
+            info = meta.get(eid, {})
+            line = f"  - {eid}"
+            details = []
+            if info.get("name"):
+                details.append(f"name: {info['name']}")
+            if info.get("relationship"):
+                details.append(f"relationship: {info['relationship']}")
+            if info.get("isSelf"):
+                details.append("isSelf=true (this person IS the user — they manage care for themselves)")
+            if details:
+                line += f"  ({', '.join(details)})"
+            entity_lines.append(line)
+        entity_context = "\nKnown entities for this user:\n" + "\n".join(entity_lines)
 
     previous_context = ""
     if previous_results_summary:
