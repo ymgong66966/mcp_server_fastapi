@@ -8,6 +8,7 @@ from follow_up_mcp import follow_up_mcp
 from memory_mcp import memory_mcp
 from escalation_mcp import escalation_mcp
 from tavily_mcp import tavily_mcp
+from company_info_mcp import company_info_mcp
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
@@ -42,7 +43,8 @@ mcp.mount(follow_up_mcp)
 mcp.mount(memory_mcp)
 mcp.mount(escalation_mcp)
 mcp.mount(tavily_mcp)
-print("Mounted sub-servers: online_mcp, follow_up_mcp, memory_mcp, escalation_mcp, tavily_mcp")
+mcp.mount(company_info_mcp)
+print("Mounted sub-servers: online_mcp, follow_up_mcp, memory_mcp, escalation_mcp, tavily_mcp, company_info_mcp")
 
 # --- Optional: Namespace transform example (commented out) ---
 # To namespace-prefix tools from a sub-server (e.g., "online_" prefix):
